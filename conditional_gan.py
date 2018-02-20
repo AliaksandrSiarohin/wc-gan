@@ -18,7 +18,8 @@ import os
 
 from itertools import chain
 from sklearn.utils import shuffle
-
+from scipy.ndimage.morphology import distance_transform_edt
+from skimage.color import gray2rgb
 
 def block(out, nkernels, down=True, bn=True, dropout=False, leaky=True, normalization=InstanceNormalization):
     if leaky:
@@ -39,7 +40,7 @@ def block(out, nkernels, down=True, bn=True, dropout=False, leaky=True, normaliz
 
 
 def make_generator(image_size, number_of_classes):
-    input_a = Input(image_size + (3,))
+    input_a = Input(image_size + (1,))
     cls = Input((1, ), dtype='int32')
     # input is 64 x 64 x nc
     conditional_instance_norm = lambda axis: (lambda inp: ConditionalInstanceNormalization(number_of_classes=number_of_classes, axis=axis)([inp, cls]))
@@ -82,16 +83,15 @@ def make_generator(image_size, number_of_classes):
 
 def make_discriminator(image_size, number_of_classes):
     input_a = Input(image_size + (3,))
-    input_b = Input(image_size + (3,))
+    input_b = Input(image_size + (1,))
     out = Concatenate(axis=-1)([input_a, input_b])
     out = Conv2D(64, kernel_size=(4, 4), strides=(2, 2))(out)
     out = block(out, 128)
     out = block(out, 256)
     real_vs_fake = block(out, 1, bn=False)
     real_vs_fake = Flatten()(real_vs_fake)
-    cls = block(out, 256)
-    cls = block(cls, 256)
-    cls = Flatten()(cls)
+    cls = Flatten()(out)
+    cls = Dense(128, activation='relu')(cls)
     cls = Dense(number_of_classes)(cls)
 
     return Model(inputs=[input_a, input_b], outputs=[real_vs_fake, cls])
@@ -105,8 +105,8 @@ class CGAN(AC_GAN):
         self.additional_inputs_for_generator_train = [self.gt_image_placeholder]
 
     def compile_intermediate_variables(self):
-        self.generator_output = self.generator(self.generator_input)
-        self.discriminator_fake_output = self.discriminator([self.generator_output, self.gt_image_placeholder])
+        self.generator_output = [self.generator(self.generator_input), self.generator_input[0]]
+        self.discriminator_fake_output = self.discriminator(self.generator_output)
         self.discriminator_real_output = self.discriminator(self.discriminator_input)
 
     def additional_generator_losses(self):
@@ -131,6 +131,17 @@ class SketchDataset(UGANDataset):
         self.load_names()
 
         self._batches_before_shuffle = len(self.images_train) / self._batch_size
+        self.test_data_index = 0
+
+    def number_of_batches_per_validation(self):
+        return len(self.images_test) / self._batch_size
+
+    def next_generator_sample_test(self):
+        index = np.arange(self.test_data_index, self.test_data_index + self._batch_size)
+        index = index % self.images_test.shape[0]
+        test_data = self._load_data_batch(index, stage='test')
+        self.test_data_index += self._batch_size
+        return list(test_data)
 
     def load_names(self):
         class_names = sorted(os.listdir(self.sketch_folder))[:self.number_of_classes]
@@ -163,22 +174,24 @@ class SketchDataset(UGANDataset):
                     self.sketch_train.append(sketch)
                     self.labels_train.append(label)
                 else:
-                    self.labels_test.append(image)
+                    self.labels_test.append(label)
                     self.sketch_test.append(sketch)
-                    self.images_test.append(label)
+                    self.images_test.append(image)
 
         self.images_train = np.array(self.images_train)
         self.images_test = np.array(self.images_test)
+
         self.sketch_train = np.array(self.sketch_train)
         self.sketch_test = np.array(self.sketch_test)
+
         self.labels_train = np.array(self.labels_train)
         self.labels_test = np.array(self.labels_test)
 
 
 
     def _load_data_batch(self, index, stage='train'):
-        load_from_folder = lambda names: np.array([resize(imread(name), self.image_size, preserve_range=True)
-                                          for name in names[index]])
+        load_from_folder = lambda names: [resize(imread(name), self.image_size, preserve_range=True)
+                                          for name in names[index]]
 
         if stage == 'train':
             sketches = load_from_folder(self.sketch_train)
@@ -190,16 +203,22 @@ class SketchDataset(UGANDataset):
             images = load_from_folder(self.images_test)
 
         labels = np.expand_dims(labels, axis=1)
-        sketches = self.preprocess_image(sketches)
-        images = self.preprocess_image(images)
+        sketches = np.array([distance_transform_edt(np.mean(sketch, axis=-1)>254)[..., np.newaxis] for sketch in sketches])
+        images = self.preprocess_image(np.array(images))
 
         return sketches, labels, images
     
     def preprocess_image(self, image):
-        return (image / 255 - 0.5) * 2
+        image /= 255
+        image -= 0.5
+        image *= 2
+        return image
     
     def deprocess(self, image):
-        return ((image/2 + 0.5) * 255).astype(np.uint8)
+        image /= 2
+        image += 0.5
+        image *= 255
+        return image.astype(np.uint8)
         
     def next_generator_sample(self):
         index = self._next_data_index()
@@ -219,6 +238,12 @@ class SketchDataset(UGANDataset):
         sketches = input_batch[0]
         gen_images = super(SketchDataset, self).display(gen_images)
         sketches = super(SketchDataset, self).display(sketches)
+        #Transform distance field to rbg image
+        sketches = np.squeeze(sketches)
+        sketches /= sketches.max()
+        sketches = gray2rgb(sketches)
+        sketches = 2 * (sketches - 0.5)
+
         result = self.deprocess(np.concatenate([sketches, gen_images], axis=1))
         return result
 
@@ -233,6 +258,7 @@ def main():
     parser.add_argument("--test_set", default='data/info/testset.txt', help='File with test set')
     parser.add_argument("--image_size", default=(64, 64), help='Size of the images')
     parser.add_argument("--number_of_classes", default=2, help='Number of classes to train on, usefull for debugging')
+    parser.add_argument("--cache_dir", default='tmp', help='Store distance transforms to this folder.')
 
     args = parser.parse_args()
 
@@ -246,6 +272,8 @@ def main():
 
     generator = make_generator(image_size=args.image_size, number_of_classes=args.number_of_classes)
     discriminator = make_discriminator(image_size=args.image_size, number_of_classes=args.number_of_classes)
+    generator.summary()
+    discriminator.summary()
 
     gan = CGAN(generator=generator, discriminator=discriminator, **vars(args))
     trainer = Trainer(dataset, gan, **vars(args))
