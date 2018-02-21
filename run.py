@@ -150,14 +150,14 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
         print (str)
         if log_file is not None:
             with open(log_file, 'a') as f:
-                print >>f, ("Epoch %s" % (epoch, )) + str
+                print >>f, ("Epoch %s " % (epoch, )) + str
     if compute_fid:
         true_images = 127.5 * dataset._X + 127.5
         str = "FID SCORE: %s" % calculate_fid_given_arrays([true_images, images])
         print (str)
         if log_file is not None:
             with open(log_file, 'a') as f:
-                print >>f, ("Epoch %s" % (epoch, )) + str
+                print >>f, ("Epoch %s " % (epoch, )) + str
 
 
 def main():
@@ -221,7 +221,7 @@ def main():
                                                generator=generator, dataset=dataset, compute_inception=False)
     else:
         at_store_checkpoint_hook = partial(compute_scores, image_shape=image_shape, log_file=log_file,
-                                               generator=generator, dataset=dataset, compute_inception=False)
+                                               generator=generator, dataset=dataset, compute_inception=True)
 
     if args.phase=='train':
         GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN, 'BOTTLENECK':ProjectiveGAN}
