@@ -146,7 +146,7 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
     dataset._batch_size = previous_batsh_size
 
     if compute_inception:
-        str = "INCEPTION SCORE: %s" % get_inception_score(images)
+        str = "INCEPTION SCORE: %s, %s" % get_inception_score(images)
         print (str)
         if log_file is not None:
             with open(log_file, 'a') as f:
