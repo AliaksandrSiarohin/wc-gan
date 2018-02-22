@@ -5,8 +5,6 @@ from keras.optimizers import Adam
 from gan.dataset import LabeledArrayDataset
 from gan.cmd import parser_with_default_args
 from gan.train import Trainer
-from gan.inception_score import get_inception_score
-from gan.fid import calculate_fid_given_arrays
 from gan.ac_gan import AC_GAN
 from gan.projective_gan import ProjectiveGAN
 from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNCondtionalDense
@@ -16,11 +14,11 @@ import numpy as np
 from gan.layer_utils import glorot_init
 
 from gan.conditional_layers import ConditionalInstanceNormalization, cond_resblock, ConditionalConv11, ConditionalDense
-from tqdm import tqdm
 import os
 import json
 from functools import partial
-
+from scorer import compute_scores
+from progressive_growing_gan import compile_and_run_progresive
 
 def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=(1, ), block_sizes=(128, 128, 128),
                    first_block_shape=(4, 4, 128), number_of_classes=10, type="CONCAT", unconditional_bottleneck=False):
@@ -41,13 +39,14 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
     unconditional_bottleneck = Conv2D if unconditional_bottleneck else None
 
     if type == "COND_BN":
-        norm = lambda axis: (lambda inp: ConditionalInstanceNormalization(number_of_classes=10, axis=axis)([inp, cls]))
+        norm = lambda axis, name: (lambda inp: ConditionalInstanceNormalization(number_of_classes=number_of_classes,
+                                                                                axis=axis, name=name)([inp, cls]))
     else:
         norm = BatchNormalization
 
-    for block_size in block_sizes:
+    for i, block_size in enumerate(block_sizes):
         y = cond_resblock(y, cls, kernel_size=(3, 3), resample="UP", nfilters=block_size, number_of_classes=number_of_classes,
-                      norm=norm, is_first=False, conv_shortcut=True, conv_layer=Conv2D,
+                      norm=norm, is_first=False, conv_shortcut=True, conv_layer=Conv2D, name='Generator.' + str(i),
                       cond_bottleneck_layer=conditional_bottleneck, uncond_bottleneck_layer=unconditional_bottleneck)
 
     y = BatchNormalization(axis=-1)(y)
@@ -87,13 +86,13 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
     norm = BatchNormalization if norm else None
 
     y = x
-    is_first = True
+    i = 0
     for block_size, resample in zip(block_sizes, resamples):
         y = cond_resblock(y, cls, kernel_size=(3, 3), resample=resample, nfilters=block_size,
-                          number_of_classes=number_of_classes, norm=norm, is_first=is_first,
-                          conv_shortcut=True, conv_layer=conv_layer,
+                          number_of_classes=number_of_classes, norm=norm, is_first=i == 0,
+                          conv_shortcut=True, conv_layer=conv_layer, name='Generator.' + str(i),
                           cond_bottleneck_layer=conditional_bottleneck, uncond_bottleneck_layer=unconditional_bottleneck)
-        is_first = False
+        i += 1
 
     y = Activation('relu')(y)
     y = GlobalAveragePooling2D()(y)
@@ -131,64 +130,8 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size = (128, )):
     return LabeledArrayDataset(X=X, y=y if supervised else None, batch_size=batch_size, noise_size=noise_size)
 
 
-def compute_scores(epoch, image_shape, generator, dataset, number_of_images=50000, compute_inception=True, compute_fid=True,
-                   log_file=None, additional_info=""):
-    if not (compute_inception or compute_fid):
-        return
-    images = np.empty((number_of_images, ) + image_shape)
-    previous_batsh_size = dataset._batch_size
-    dataset._batch_size = 100
-    for i in tqdm(range(0, 50000, 100)):
-        g_s = dataset.next_generator_sample_test()
-        images[i:(i+100)] = generator.predict(g_s)
-    images *= 127.5
-    images += 127.5
-    dataset._batch_size = previous_batsh_size
 
-    if compute_inception:
-        str = "INCEPTION SCORE: %s, %s" % get_inception_score(images)
-        print (str)
-        if log_file is not None:
-            with open(log_file, 'a') as f:
-                print >>f, ("Epoch %s " % (epoch, )) + str + " " + additional_info
-    if compute_fid:
-        true_images = 127.5 * dataset._X + 127.5
-        str = "FID SCORE: %s" % calculate_fid_given_arrays([true_images, images])
-        print (str)
-        if log_file is not None:
-            with open(log_file, 'a') as f:
-                print >>f, ("Epoch %s " % (epoch, )) + str + " " + additional_info
-
-
-def main():
-    parser = parser_with_default_args()
-    parser.add_argument("--phase", choices=['train', 'test'], default='train')
-    parser.add_argument("--generator_batch_multiple", default=2, type=int,
-                        help="Size of the generator batch, multiple of batch_size.")
-    parser.add_argument("--lr", default=2e-4, type=float, help="Learning rate")
-    parser.add_argument("--beta1", default=0.5, type=float, help='Adam parameter')
-    parser.add_argument("--beta2", default=0.999, type=float, help='Adam parameter')
-    parser.add_argument("--dataset", default='mnist', choices=['mnist', 'cifar10'], help='Dataset to train on')
-    parser.add_argument("--spectral", default=0, type=int, help='Use spectral norm in discriminator')
-    parser.add_argument("--generator_type", default=None, choices=[None, "CONCAT", "COND_BN", "BOTTLENECK"],
-                        help='Type of generator to use. None for unsuperwised')
-    parser.add_argument("--discriminator_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE', 'BOTTLENECK'],
-                        help='Type of generator to use. None for unsuperwised')
-    parser.add_argument("--uncoditional_bottleneck", default=0, type=int)
-    parser.add_argument("--bn_in_discriminator", default=0, type=int)
-    args = parser.parse_args()
-
-    dataset = get_dataset(dataset = args.dataset,
-                          batch_size=args.batch_size,
-                          supervised=args.generator_type is not None)
-
-    args.output_dir = "output/%s_%s_%s" % (args.dataset, str(args.generator_type), str(args.discriminator_type))
-    args.checkpoints_dir = args.output_dir
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
-    with open(os.path.join(args.output_dir, 'config.json'), 'w') as outfile:
-        json.dump(vars(args), outfile, indent=4)
-
+def compile_and_run(dataset, args):
     image_shape = (28, 28, 1) if args.dataset == 'mnist' else (32, 32, 3)
 
     generator = make_generator(output_channels=1 if args.dataset == 'mnist' else 3,
@@ -235,6 +178,46 @@ def main():
         trainer.train()
     else:
         at_store_checkpoint_hook()
+
+
+def main():
+    parser = parser_with_default_args()
+    parser.add_argument("--phase", choices=['train', 'test'], default='train')
+    parser.add_argument("--generator_batch_multiple", default=2, type=int,
+                        help="Size of the generator batch, multiple of batch_size.")
+    parser.add_argument("--lr", default=2e-4, type=float, help="Learning rate")
+    parser.add_argument("--beta1", default=0.5, type=float, help='Adam parameter')
+    parser.add_argument("--beta2", default=0.999, type=float, help='Adam parameter')
+    parser.add_argument("--dataset", default='mnist', choices=['mnist', 'cifar10'], help='Dataset to train on')
+    parser.add_argument("--spectral", default=0, type=int, help='Use spectral norm in discriminator')
+    parser.add_argument("--generator_type", default=None, choices=[None, "CONCAT", "COND_BN", "BOTTLENECK"],
+                        help='Type of generator to use. None for unsuperwised')
+    parser.add_argument("--discriminator_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE', 'BOTTLENECK'],
+                        help='Type of generator to use. None for unsuperwised')
+    parser.add_argument("--uncoditional_bottleneck", default=0, type=int)
+    parser.add_argument("--bn_in_discriminator", default=0, type=int)
+    parser.add_argument("--progresive", default=0, type=int)
+    parser.add_argument("--epochs_per_progresive_stage", default=1, type=int)
+    parser.add_argument("--tmp_progresive_checkpoints_dir", default='tmp')
+    args = parser.parse_args()
+
+    dataset = get_dataset(dataset=args.dataset,
+                          batch_size=args.batch_size,
+                          supervised=args.generator_type is not None)
+
+    args.output_dir = "output/%s_%s_%s" % (args.dataset, str(args.generator_type), str(args.discriminator_type))
+    args.checkpoints_dir = args.output_dir
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+    with open(os.path.join(args.output_dir, 'config.json'), 'w') as outfile:
+        json.dump(vars(args), outfile, indent=4)
+
+
+    if not args.progresive:
+        compile_and_run(dataset, args)
+    else:
+        compile_and_run_progresive(dataset, args)
+
 
 if __name__ == "__main__":
     main()
