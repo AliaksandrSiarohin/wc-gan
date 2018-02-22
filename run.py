@@ -99,7 +99,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
     y = GlobalAveragePooling2D()(y)
 
     if type == 'AC_GAN':
-        cls_out = dence_layer(units=number_of_classes, use_bias=True, kernel_initializer=glorot_init)(y)
+        cls_out = Dense(units=number_of_classes, use_bias=True, kernel_initializer=glorot_init)(y)
         out = dence_layer(units=1, use_bias=True, kernel_initializer=glorot_init)(y)
 
         return Model(inputs=x, outputs=[out, cls_out])
@@ -132,7 +132,7 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size = (128, )):
 
 
 def compute_scores(epoch, image_shape, generator, dataset, number_of_images=50000, compute_inception=True, compute_fid=True,
-                   log_file=None):
+                   log_file=None, additional_info=""):
     if not (compute_inception or compute_fid):
         return
     images = np.empty((number_of_images, ) + image_shape)
@@ -150,14 +150,14 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
         print (str)
         if log_file is not None:
             with open(log_file, 'a') as f:
-                print >>f, ("Epoch %s " % (epoch, )) + str
+                print >>f, ("Epoch %s " % (epoch, )) + str + " " + additional_info
     if compute_fid:
         true_images = 127.5 * dataset._X + 127.5
         str = "FID SCORE: %s" % calculate_fid_given_arrays([true_images, images])
         print (str)
         if log_file is not None:
             with open(log_file, 'a') as f:
-                print >>f, ("Epoch %s " % (epoch, )) + str
+                print >>f, ("Epoch %s " % (epoch, )) + str + " " + additional_info
 
 
 def main():
@@ -202,6 +202,7 @@ def main():
                                        norm=args.bn_in_discriminator,
                                        spectral=args.spectral,
                                        unconditional_bottleneck=args.uncoditional_bottleneck)
+    additional_info = json.dumps(vars(args))
 
     print (generator.summary())
     print (discriminator.summary())
@@ -218,10 +219,12 @@ def main():
 
     if args.dataset == 'mnist':
         at_store_checkpoint_hook = partial(compute_scores, image_shape=image_shape, log_file=log_file,
-                                               generator=generator, dataset=dataset, compute_inception=False)
+                                            generator=generator, dataset=dataset, compute_inception=False,
+                                            additional_info=additional_info)
     else:
         at_store_checkpoint_hook = partial(compute_scores, image_shape=image_shape, log_file=log_file,
-                                               generator=generator, dataset=dataset, compute_inception=True)
+                                           generator=generator, dataset=dataset, compute_inception=True,
+                                           additional_info=additional_info)
 
     if args.phase=='train':
         GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN, 'BOTTLENECK':ProjectiveGAN}
