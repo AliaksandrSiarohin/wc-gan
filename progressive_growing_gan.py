@@ -223,7 +223,7 @@ def compile_and_run_progresive(dataset, args):
             at_store_checkpoint_hook = partial(compute_scores, image_shape=image_shape, log_file=log_file,
                                            generator=generator, dataset=dataset, compute_inception=False, compute_fid=False,
                                            additional_info=additional_info)
-
+	
         if args.phase=='train':
             GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN, 'BOTTLENECK':ProjectiveGAN}
             gan = GANS[args.discriminator_type](generator=generator, discriminator=discriminator, **vars(args))
@@ -231,6 +231,8 @@ def compile_and_run_progresive(dataset, args):
             dataset_type = args.dataset
             del args.dataset
             args.number_of_epochs = args.epochs_per_progresive_stage
+	    args.start_epoch = stage * args.epochs_per_progresive_stage
+            
             trainer = Trainer(dataset, gan, at_store_checkpoint_hook=at_store_checkpoint_hook,  **vars(args))
             trainer.train()
             args.dataset = dataset_type
