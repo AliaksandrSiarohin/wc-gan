@@ -6,14 +6,16 @@ from gan.conditional_layers import cond_resblock, ConditionalConv11, Conditional
 from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNCondtionalDense
 from gan.layer_utils import glorot_init
 from generator import Mul
-
+from functools import partial
+import keras.backend as K
 
 def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(128, 128, 128, 128),
                        resamples=('DOWN', "DOWN", "SAME", "SAME"), number_of_classes=10,
                        type='AC_GAN', norm=False, spectral=False,
                        conditional_bottleneck=False, unconditional_bottleneck=False,
                        conditional_shortcut=False, unconditional_shortcut=True,
-                       progressive=False, progressive_stage=0, progressive_iters_per_stage=10000):
+                       progressive=False, progressive_stage=0, progressive_iters_per_stage=10000,
+                       fully_diff_spectral=False, spectral_iterations=1, conv_singular=True):
 
     assert conditional_shortcut or unconditional_shortcut
     assert len(block_sizes) == len(resamples)
@@ -21,10 +23,14 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
     cls = Input(input_cls_shape, dtype='int32')
 
     if spectral:
-        conv_layer = SNConv2D
-        cond_conv_layer = SNConditionalConv11
-        dence_layer = SNDense
-        cond_dence_layer = SNCondtionalDense
+        conv_layer = partial(SNConv2D, conv_singular=conv_singular,
+                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
+        cond_conv_layer = partial(SNConditionalConv11,
+                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
+        dence_layer = partial(SNDense,
+                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
+        cond_dence_layer = partial(SNCondtionalDense,
+                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
     else:
         conv_layer = Conv2D
         cond_conv_layer = ConditionalConv11
@@ -37,11 +43,15 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         y = x
         i = 0
         for block_size, resample in zip(block_sizes, resamples):
+            input_dim = K.int_shape(y)[-1]
+            uncond_shortcut = (input_dim != block_size) or (resample != "SAME")
+            uncond_shortcut = unconditional_shortcut and uncond_shortcut
+
             y = cond_resblock(y, cls, kernel_size=(3, 3), resample=resample, nfilters=block_size,
                               number_of_classes=number_of_classes, name='Discriminator.' + str(i), norm=norm,
                               is_first=False, conv_layer=conv_layer, cond_conv_layer=cond_conv_layer,
                               cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
-                              cond_shortcut=conditional_shortcut, uncond_shortcut=unconditional_shortcut)
+                              cond_shortcut=conditional_shortcut, uncond_shortcut=uncond_shortcut)
             i += 1
     else:
         size_drop = 2 ** (len(block_sizes) - ((progressive_stage + 1) / 2) - 1)

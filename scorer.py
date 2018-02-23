@@ -18,15 +18,22 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
     images += 127.5
     dataset._batch_size = previous_batsh_size
 
+    def to_rgb(array):
+        if array.shape[-1] != 3:
+            #hack for grayscale mnist
+            return np.concatenate([array, array, array], axis=-1)
+        else:
+            return array
+
     if compute_inception:
-        str = "INCEPTION SCORE: %s, %s" % get_inception_score(images)
+        str = "INCEPTION SCORE: %s, %s" % get_inception_score(to_rgb(images))
         print (str)
         if log_file is not None:
             with open(log_file, 'a') as f:
                 print >>f, ("Epoch %s " % (epoch, )) + str + " " + additional_info
     if compute_fid:
         true_images = 127.5 * dataset._X + 127.5
-        str = "FID SCORE: %s" % calculate_fid_given_arrays([true_images, images])
+        str = "FID SCORE: %s" % calculate_fid_given_arrays([to_rgb(true_images), to_rgb(images)])
         print (str)
         if log_file is not None:
             with open(log_file, 'a') as f:

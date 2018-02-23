@@ -103,8 +103,8 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
 def get_generator_params(args):
     params = Namespace()
     params.output_channels = 1 if args.dataset == 'mnist' else 3
-    params.input_cls_shape=(1, )
-    params.block_sizes = (256, 256) if args.dataset == 'mnist' else (256, 256, 256)
+    params.input_cls_shape = (1, )
+    params.block_sizes = (128, 128) if args.dataset == 'mnist' else (256, 256, 256)
     params.first_block_shape = (7, 7, 256) if args.dataset == 'mnist' else (4, 4, 256)
     params.number_of_classes = 10
     params.concat_cls = (args.generator_type == "CONCAT")
@@ -123,15 +123,20 @@ def get_generator_params(args):
 def get_discriminator_params(args):
     params = Namespace()
     params.input_image_shape = args.image_shape
-    params.input_cls_shape=(1, )
+    params.input_cls_shape = (1, )
     params.block_sizes = (128, 128, 128, 128)
-    params.resamples =('DOWN', "DOWN", "SAME", "SAME")
+    params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
     params.number_of_classes=10
     params.norm = args.bn_in_discriminator
+
     params.spectral = args.spectral
+    params.fully_diff_spectral = args.fully_diff_spectral
+    params.spectral_iterations = args.spectral_iterations
+    params.conv_singular = args.conv_singular
+
     params.type = args.discriminator_type
     params.conditional_bottleneck = (args.discriminator_type == "BOTTLENECK")
-    params.unconditional_bottleneck= False
+    params.unconditional_bottleneck = False
     params.conditional_shortcut = (args.discriminator_type == "SHORTCUT")
     params.unconditional_shortcut = (args.discriminator_type != "SHORTCUT")
 
@@ -150,7 +155,11 @@ def main():
     parser.add_argument("--beta1", default=0, type=float, help='Adam parameter')
     parser.add_argument("--beta2", default=0.9, type=float, help='Adam parameter')
     parser.add_argument("--dataset", default='mnist', choices=['mnist', 'cifar10'], help='Dataset to train on')
+
     parser.add_argument("--spectral", default=0, type=int, help='Use spectral norm in discriminator')
+    parser.add_argument("--fully_diff_spectral", default=0, type=int, help='Fully difirentiable spectral normalization')
+    parser.add_argument("--spectral_iterations", default=1, type=int, help='Number of iteration per spectral update')
+    parser.add_argument("--conv_singular", default=0, type=int, help='Singular convolution layer')
 
     parser.add_argument("--generator_type", default=None, choices=[None, "CONCAT", "COND_BN", "BOTTLENECK", "SHORTCUT"],
                         help='Type of generator to use. None for unsuperwised')
@@ -168,6 +177,7 @@ def main():
     parser.add_argument("--compute_fid", default=1, type=int, help="Compute fid score")
     parser.add_argument("--plot_model", default=0, type=int)
     parser.add_argument("--print_summary", default=1, type=int, help="Print summary of models")
+
 
     args = parser.parse_args()
 
