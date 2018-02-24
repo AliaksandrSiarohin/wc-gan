@@ -18,6 +18,9 @@ from generator import make_generator
 from discriminator import make_discriminator
 from keras.utils import plot_model
 
+from keras import backend as K
+from keras.backend import tf as ktf
+
 
 def get_dataset(dataset, batch_size, supervised = False, noise_size = (128, )):
     assert dataset in ['mnist', 'cifar10']
@@ -45,6 +48,8 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
                                        dataset=dataset, compute_inception=args.compute_inception,
                                        compute_fid=args.compute_fid, additional_info=additional_info)
 
+    lr_decay_schedule_generator, lr_decay_schedule_discriminator = get_lr_decay_schedule(args)
+
     def run_stage(stage, generator_checkpoint, discriminator_checkpoint):
         generator = make_generator(**vars(generator_params))
         discriminator = make_discriminator(**vars(discriminator_params))
@@ -70,7 +75,10 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
 
         if args.phase == 'train':
             GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN}
-            gan = GANS[args.discriminator_type](generator=generator, discriminator=discriminator, **vars(args))
+            gan = GANS[args.discriminator_type](generator=generator, discriminator=discriminator,
+                                                lr_decay_schedule_discriminator = lr_decay_schedule_discriminator,
+                                                lr_decay_schedule_generator = lr_decay_schedule_generator,
+                                                **vars(args))
 
             args.start_epoch = args.start_epoch + stage * args.number_of_epochs
 
@@ -98,6 +106,29 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
             generator_checkpoint, discriminator_checkpoint = run_stage(stage, generator_checkpoint, discriminator_checkpoint)
     else:
         run_stage(0, generator_checkpoint, discriminator_checkpoint)
+
+
+def get_lr_decay_schedule(args):
+    number_of_iters_generator = 1000. * args.number_of_epochs
+    number_of_iters_discriminator = 1000. * args.number_of_epochs * args.training_ratio
+
+    if args.lr_decay_schedule is None:
+        lr_decay_schedule_generator = lambda iter: 1.
+        lr_decay_schedule_discriminator = lambda iter: 1.
+    elif args.lr_decay_schedule == 'linear':
+        lr_decay_schedule_generator = lambda iter: K.maximum(0., 1. - K.cast(iter, 'float32') / number_of_iters_generator)
+        lr_decay_schedule_discriminator = lambda iter: K.maximum(0., 1. - K.cast(iter, 'float32') / number_of_iters_discriminator)
+    elif args.lr_decay_schedule == 'half-linear':
+        lr_decay_schedule_generator = lambda iter: ktf.where(
+                                K.less(iter, K.cast(number_of_iters_generator / 2, 'int64')),
+                                ktf.maximum(0., 1. - (K.cast(iter, 'float32') / number_of_iters_generator)), 0.5)
+        lr_decay_schedule_discriminator = lambda iter: ktf.where(
+                                K.less(iter, K.cast(number_of_iters_discriminator / 2, 'int64')),
+                                ktf.maximum(0., 1. - (K.cast(iter, 'float32') / number_of_iters_discriminator)), 0.5)
+    else:
+        assert False
+
+    return lr_decay_schedule_generator, lr_decay_schedule_discriminator
 
 
 def get_generator_params(args):
@@ -177,6 +208,9 @@ def main():
     parser.add_argument("--compute_fid", default=1, type=int, help="Compute fid score")
     parser.add_argument("--plot_model", default=0, type=int)
     parser.add_argument("--print_summary", default=1, type=int, help="Print summary of models")
+    parser.add_argument("--lr_decay_schedule", default=None, choices=[None, 'linear', 'half-linear'],
+                        help='Learnign rate decay schedule. None - no decay. '
+                             'linear - linear decay to zero. half-linear - linear decay to 0.5')
 
 
     args = parser.parse_args()
