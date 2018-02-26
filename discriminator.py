@@ -49,7 +49,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
 
             y = cond_resblock(y, cls, kernel_size=(3, 3), resample=resample, nfilters=block_size,
                               number_of_classes=number_of_classes, name='Discriminator.' + str(i), norm=norm,
-                              is_first=False, conv_layer=conv_layer, cond_conv_layer=cond_conv_layer,
+                              is_first=(i==0), conv_layer=conv_layer, cond_conv_layer=cond_conv_layer,
                               cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
                               cond_shortcut=conditional_shortcut, uncond_shortcut=uncond_shortcut)
             i += 1
