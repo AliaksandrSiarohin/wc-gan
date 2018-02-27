@@ -4,7 +4,7 @@ from keras.layers import BatchNormalization, Add, Embedding, Concatenate, UpSamp
 
 from gan.conditional_layers import cond_resblock, ConditionalConv11, ConditionalDense
 from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNCondtionalDense
-from gan.layer_utils import glorot_init
+from gan.layer_utils import glorot_init, GlobalSumPooling2D
 from generator import Mul
 from functools import partial
 import keras.backend as K
@@ -15,7 +15,8 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
                        conditional_bottleneck=False, unconditional_bottleneck=False,
                        conditional_shortcut=False, unconditional_shortcut=True,
                        progressive=False, progressive_stage=0, progressive_iters_per_stage=10000,
-                       fully_diff_spectral=False, spectral_iterations=1, conv_singular=True):
+                       fully_diff_spectral=False, spectral_iterations=1, conv_singular=True,
+                       sum_pool=False):
 
     assert conditional_shortcut or unconditional_shortcut
     assert len(block_sizes) == len(resamples)
@@ -95,7 +96,10 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
 
 
     y = Activation('relu')(y)
-    y = GlobalAveragePooling2D()(y)
+    if sum_pool:
+        y = GlobalSumPooling2D()(y)
+    else: 
+        y = GlobalAveragePooling2D()(y)
 
     if type == 'AC_GAN':
         cls_out = Dense(units=number_of_classes, use_bias=True, kernel_initializer=glorot_init)(y)

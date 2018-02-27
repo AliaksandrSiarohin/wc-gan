@@ -125,6 +125,22 @@ def get_lr_decay_schedule(args):
         lr_decay_schedule_discriminator = lambda iter: ktf.where(
                                 K.less(iter, K.cast(number_of_iters_discriminator / 2, 'int64')),
                                 ktf.maximum(0., 1. - (K.cast(iter, 'float32') / number_of_iters_discriminator)), 0.5)
+    elif args.lr_decay_schedule == 'linear-end':
+        decay_at = 0.0
+
+        number_of_iters_until_decay_generator = number_of_iters_generator * decay_at
+        number_of_iters_until_decay_discriminator = number_of_iters_discriminator * decay_at
+
+        number_of_iters_after_decay_generator = number_of_iters_generator * (1 - decay_at)
+        number_of_iters_after_decay_discriminator = number_of_iters_discriminator * (1 - decay_at)
+
+
+        lr_decay_schedule_generator = lambda iter: ktf.where(
+                                K.greater(iter, K.cast(number_of_iters_until_decay_generator, 'int64')),
+                                ktf.maximum(0., 1. - (K.cast(iter, 'float32') - number_of_iters_until_decay_generator) / number_of_iters_after_decay_generator), 1)
+        lr_decay_schedule_discriminator = lambda iter: ktf.where(
+                                K.greater(iter, K.cast(number_of_iters_until_decay_discriminator, 'int64')),
+                                ktf.maximum(0., 1. - (K.cast(iter, 'float32') - number_of_iters_until_decay_discriminator) / number_of_iters_after_decay_discriminator), 1)
     else:
         assert False
 
@@ -174,6 +190,8 @@ def get_discriminator_params(args):
     params.progressive = args.progressive
     params.progressive_stage = args.progressive_stage
     params.progressive_iters_per_stage = args.number_of_epochs * 1000
+    
+    params.sum_pool = args.sum_pool
     return params
 
 
@@ -208,9 +226,13 @@ def main():
     parser.add_argument("--compute_fid", default=1, type=int, help="Compute fid score")
     parser.add_argument("--plot_model", default=0, type=int)
     parser.add_argument("--print_summary", default=1, type=int, help="Print summary of models")
-    parser.add_argument("--lr_decay_schedule", default=None, choices=[None, 'linear', 'half-linear'],
+    parser.add_argument("--lr_decay_schedule", default=None, choices=[None, 'linear', 'half-linear', 'linear-end'],
                         help='Learnign rate decay schedule. None - no decay. '
-                             'linear - linear decay to zero. half-linear - linear decay to 0.5')
+                             'linear - linear decay to zero. half-linear - linear decay to 0.5'
+			     'linear-end constant until 0.9, then linear decay to 0')
+    parser.add_argument("--sum_pool", default=0, type=int,
+                        help='Use sum or average pooling')
+
 
 
     args = parser.parse_args()
