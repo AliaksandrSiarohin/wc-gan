@@ -74,7 +74,7 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
         hook = partial(at_store_checkpoint_hook, generator=generator)
 
         if args.phase == 'train':
-            GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN}
+            GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN, 'SHORTCUT':ProjectiveGAN, 'BOTTTLENECK':ProjectiveGAN}
             gan = GANS[args.discriminator_type](generator=generator, discriminator=discriminator,
                                                 lr_decay_schedule_discriminator = lr_decay_schedule_discriminator,
                                                 lr_decay_schedule_generator = lr_decay_schedule_generator,
@@ -126,7 +126,7 @@ def get_lr_decay_schedule(args):
                                 K.less(iter, K.cast(number_of_iters_discriminator / 2, 'int64')),
                                 ktf.maximum(0., 1. - (K.cast(iter, 'float32') / number_of_iters_discriminator)), 0.5)
     elif args.lr_decay_schedule == 'linear-end':
-        decay_at = 0.0
+        decay_at = 0.9
 
         number_of_iters_until_decay_generator = number_of_iters_generator * decay_at
         number_of_iters_until_decay_discriminator = number_of_iters_discriminator * decay_at

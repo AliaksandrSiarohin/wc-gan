@@ -98,7 +98,7 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
             output = UpSampling2D(size=(size_mul, size_mul))(output)
 
 
-    no_lables = (not conditional_bn) and (not conditional_shortcut) and (not concat_cls) and (not conditional_shortcut)
+    no_lables = (not conditional_bn) and (not conditional_bottleneck) and (not concat_cls) and (not conditional_shortcut)
     if no_lables:
         return Model(inputs=[inp], outputs=output)
     else:
