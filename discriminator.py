@@ -16,7 +16,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
                        conditional_shortcut=False, unconditional_shortcut=True,
                        progressive=False, progressive_stage=0, progressive_iters_per_stage=10000,
                        fully_diff_spectral=False, spectral_iterations=1, conv_singular=True,
-                       sum_pool=False):
+                       sum_pool=False, renorm_for_cond_singular=False):
 
     assert conditional_shortcut or unconditional_shortcut
     assert len(block_sizes) == len(resamples)
@@ -27,11 +27,13 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         conv_layer = partial(SNConv2D, conv_singular=conv_singular,
                               fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
         cond_conv_layer = partial(SNConditionalConv11,
-                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
+                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations,
+                              renormalize=renorm_for_cond_singular)
         dence_layer = partial(SNDense,
                               fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
         cond_dence_layer = partial(SNCondtionalDense,
-                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
+                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations,
+                              renormalize=renorm_for_cond_singular)
     else:
         conv_layer = Conv2D
         cond_conv_layer = ConditionalConv11
@@ -107,7 +109,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
 
         return Model(inputs=x, outputs=[out, cls_out])
     elif type == "PROJECTIVE":
-        phi = cond_dence_layer(units=1, number_of_classes=number_of_classes,
+        phi = cond_dence_layer(units=1, number_of_classes=number_of_classes, name='Discriminator.final_cond_dence',
                                use_bias=True, kernel_initializer=glorot_init)([y,cls])
         psi = dence_layer(units=1, use_bias=True, kernel_initializer=glorot_init)(y)
         out = Add()([phi, psi])

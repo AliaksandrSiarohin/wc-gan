@@ -6,6 +6,7 @@ from gan.train import Trainer
 from gan.ac_gan import AC_GAN
 from gan.projective_gan import ProjectiveGAN
 from gan.gan import GAN
+from gan.conditional_layers import ConditionalAdamOptimizer
 
 import os
 import json
@@ -38,9 +39,14 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size = (128, )):
 
 def compile_and_run(dataset, args, generator_params, discriminator_params):
     additional_info = json.dumps(vars(args))
-
-    args.generator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
-    args.discriminator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
+    if not args.conditional_optimizer:
+        args.generator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
+        args.discriminator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
+    else:
+        args.generator_optimizer = ConditionalAdamOptimizer(number_of_classes=generator_params.number_of_classes,
+                                                            lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
+        args.discriminator_optimizer = ConditionalAdamOptimizer(number_of_classes=discriminator_params.number_of_classes,
+                                                             lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
 
     log_file = os.path.join(args.output_dir, 'log.txt')
 
@@ -74,7 +80,7 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
         hook = partial(at_store_checkpoint_hook, generator=generator)
 
         if args.phase == 'train':
-            GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN, 'SHORTCUT':ProjectiveGAN, 'BOTTTLENECK':ProjectiveGAN}
+            GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN, 'SHORTCUT':ProjectiveGAN, 'BOTTLENECK':ProjectiveGAN}
             gan = GANS[args.discriminator_type](generator=generator, discriminator=discriminator,
                                                 lr_decay_schedule_discriminator = lr_decay_schedule_discriminator,
                                                 lr_decay_schedule_generator = lr_decay_schedule_generator,
@@ -180,8 +186,9 @@ def get_discriminator_params(args):
     params.fully_diff_spectral = args.fully_diff_spectral
     params.spectral_iterations = args.spectral_iterations
     params.conv_singular = args.conv_singular
+    params.renorm_for_cond_singular = args.renorm_for_cond_singular
 
-    params.type = args.discriminator_type
+    params.type = 'PROJECTIVE'# args.discriminator_type
     params.conditional_bottleneck = (args.discriminator_type == "BOTTLENECK")
     params.unconditional_bottleneck = False
     params.conditional_shortcut = (args.discriminator_type == "SHORTCUT")
@@ -192,6 +199,7 @@ def get_discriminator_params(args):
     params.progressive_iters_per_stage = args.number_of_epochs * 1000
     
     params.sum_pool = args.sum_pool
+
     return params
 
 
@@ -229,11 +237,13 @@ def main():
     parser.add_argument("--lr_decay_schedule", default=None, choices=[None, 'linear', 'half-linear', 'linear-end'],
                         help='Learnign rate decay schedule. None - no decay. '
                              'linear - linear decay to zero. half-linear - linear decay to 0.5'
-			     'linear-end constant until 0.9, then linear decay to 0')
+			            'linear-end constant until 0.9, then linear decay to 0')
     parser.add_argument("--sum_pool", default=0, type=int,
                         help='Use sum or average pooling')
-
-
+    parser.add_argument("--conditional_optimizer", type=int, default=0,
+                        help="Increase lerning rate for conditional layers")
+    parser.add_argument("--renorm_for_cond_singular", type=int, default=0,
+                        help='If renorm decrease singular value in cond layers accordinnly to number_of_classses')
 
     args = parser.parse_args()
 

@@ -33,7 +33,7 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
                 print >>f, ("Epoch %s " % (epoch, )) + str + " " + additional_info
     if compute_fid:
         true_images = 127.5 * dataset._X + 127.5
-        str = "FID SCORE: %s" % calculate_fid_given_arrays([to_rgb(true_images), to_rgb(images)])
+        str = "FID SCORE: %s" % calculate_fid_given_arrays([to_rgb(true_images)[:10000], to_rgb(images)[:5000]])
         print (str)
         if log_file is not None:
             with open(log_file, 'a') as f:
