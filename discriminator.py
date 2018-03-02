@@ -1,9 +1,9 @@
 from keras.models import Input, Model
-from keras.layers import Dense, Reshape, Activation, Conv2D, GlobalAveragePooling2D
+from keras.layers import Dense, Reshape, Activation, Conv2D, GlobalAveragePooling2D, Lambda
 from keras.layers import BatchNormalization, Add, Embedding, Concatenate, UpSampling2D, AveragePooling2D, Subtract
 
 from gan.conditional_layers import cond_resblock, ConditionalConv11, ConditionalDense
-from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNCondtionalDense
+from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNCondtionalDense, SNEmbeding
 from gan.layer_utils import glorot_init, GlobalSumPooling2D
 from generator import Mul
 from functools import partial
@@ -34,11 +34,13 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         cond_dence_layer = partial(SNCondtionalDense,
                               fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations,
                               renormalize=renorm_for_cond_singular)
+        emb_layer = partial(SNEmbeding, fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
     else:
         conv_layer = Conv2D
         cond_conv_layer = ConditionalConv11
         dence_layer = Dense
         cond_dence_layer = ConditionalDense
+        emb_layer = Embedding
 
     norm = BatchNormalization if norm else None
 
@@ -109,8 +111,10 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
 
         return Model(inputs=x, outputs=[out, cls_out])
     elif type == "PROJECTIVE":
-        phi = cond_dence_layer(units=1, number_of_classes=number_of_classes, name='Discriminator.final_cond_dence',
-                               use_bias=True, kernel_initializer=glorot_init)([y,cls])
+        emb = emb_layer(input_dim = number_of_classes, output_dim = block_sizes[-1])(cls)
+        phi = Lambda(lambda inp: K.sum(inp[1] * K.expand_dims(inp[0], axis=1), axis=2), output_shape=(1, ))([y, emb])
+        # phi = cond_dence_layer(units=1, number_of_classes=number_of_classes, name='Discriminator.final_cond_dence',
+        #                        use_bias=True, kernel_initializer=glorot_init)([y,cls])
         psi = dence_layer(units=1, use_bias=True, kernel_initializer=glorot_init)(y)
         out = Add()([phi, psi])
         return Model(inputs=[x,cls], outputs=[out])
