@@ -6,7 +6,7 @@ from keras.layers import BatchNormalization, Add, Embedding, Concatenate, UpSamp
 import numpy as np
 from gan.layer_utils import glorot_init
 
-from gan.conditional_layers import ConditionalInstanceNormalization, cond_resblock, ConditionalConv11
+from gan.conditional_layers import ConditinalBatchNormalization, cond_resblock, ConditionalConv11
 
 import keras.backend as K
 
@@ -51,7 +51,7 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
     y = Reshape(first_block_shape)(y)
 
     if conditional_bn:
-        norm = lambda axis, name: (lambda inp: ConditionalInstanceNormalization(number_of_classes=number_of_classes,
+        norm = lambda axis, name: (lambda inp: ConditinalBatchNormalization(number_of_classes=number_of_classes,
                                                                                 axis=axis, name=name)([inp, cls]))
     else:
         norm = BatchNormalization

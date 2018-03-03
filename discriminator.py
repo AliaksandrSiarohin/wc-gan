@@ -26,20 +26,21 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
     if spectral:
         conv_layer = partial(SNConv2D, conv_singular=conv_singular,
                               fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
-        cond_conv_layer = partial(SNConditionalConv11,
-                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations,
-                              renormalize=renorm_for_cond_singular)
-        dence_layer = partial(SNDense,
-                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
         cond_dence_layer = partial(SNCondtionalDense,
                               fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations,
                               renormalize=renorm_for_cond_singular)
+        cond_conv_layer = partial(SNConditionalConv11,
+                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations,
+                              renormalize=renorm_for_cond_singular)
+
+        dence_layer = partial(SNDense,
+                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
         emb_layer = partial(SNEmbeding, fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
     else:
         conv_layer = Conv2D
+        cond_dence_layer = ConditionalDense
         cond_conv_layer = ConditionalConv11
         dence_layer = Dense
-        cond_dence_layer = ConditionalDense
         emb_layer = Embedding
 
     norm = BatchNormalization if norm else None
@@ -113,8 +114,6 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
     elif type == "PROJECTIVE":
         emb = emb_layer(input_dim = number_of_classes, output_dim = block_sizes[-1])(cls)
         phi = Lambda(lambda inp: K.sum(inp[1] * K.expand_dims(inp[0], axis=1), axis=2), output_shape=(1, ))([y, emb])
-        # phi = cond_dence_layer(units=1, number_of_classes=number_of_classes, name='Discriminator.final_cond_dence',
-        #                        use_bias=True, kernel_initializer=glorot_init)([y,cls])
         psi = dence_layer(units=1, use_bias=True, kernel_initializer=glorot_init)(y)
         out = Add()([phi, psi])
         return Model(inputs=[x,cls], outputs=[out])
@@ -122,5 +121,8 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         out = dence_layer(units=1, use_bias=True, kernel_initializer=glorot_init)(y)
         return Model(inputs=[x], outputs=[out])
     else:
-        out = dence_layer(units=1, use_bias=True, kernel_initializer=glorot_init)(y)
+        out_phi = cond_dence_layer(units=1, name='Discriminator.dence_cond_', number_of_classes=number_of_classes,
+                               use_bias=True, kernel_initializer=glorot_init)([y, cls])
+        out_psi = dence_layer(units=1, use_bias=True, kernel_initializer=glorot_init)(y)
+        out = Add()([out_phi, out_psi])
         return Model(inputs=[x,cls], outputs=[out])

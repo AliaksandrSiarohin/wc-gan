@@ -5,13 +5,13 @@ from tqdm import tqdm
 
 
 def compute_scores(epoch, image_shape, generator, dataset, number_of_images=50000, compute_inception=True, compute_fid=True,
-                   log_file=None, additional_info=""):
+                   log_file=None, cache_file='mnist_fid.npz', additional_info=""):
     if not (compute_inception or compute_fid):
         return
     images = np.empty((number_of_images, ) + image_shape)
     previous_batsh_size = dataset._batch_size
     dataset._batch_size = 100
-    for i in tqdm(range(0, 50000, 100)):
+    for i in tqdm(range(0, number_of_images, 100)):
         g_s = dataset.next_generator_sample_test()
         images[i:(i+100)] = generator.predict(g_s)
     images *= 127.5
@@ -33,7 +33,8 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
                 print >>f, ("Epoch %s " % (epoch, )) + str + " " + additional_info
     if compute_fid:
         true_images = 127.5 * dataset._X + 127.5
-        str = "FID SCORE: %s" % calculate_fid_given_arrays([to_rgb(true_images)[:10000], to_rgb(images)[:5000]])
+        str = "FID SCORE: %s" % calculate_fid_given_arrays([to_rgb(true_images)[:number_of_images],
+                                                            to_rgb(images)[:number_of_images]], cache_file=cache_file)
         print (str)
         if log_file is not None:
             with open(log_file, 'a') as f:

@@ -52,7 +52,8 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
 
     at_store_checkpoint_hook = partial(compute_scores, image_shape=args.image_shape, log_file=log_file,
                                        dataset=dataset, compute_inception=args.compute_inception,
-                                       compute_fid=args.compute_fid, additional_info=additional_info)
+                                       compute_fid=args.compute_fid, additional_info=additional_info,
+                                       number_of_images=args.samples_for_evaluation, cache_file=args.fid_cache_file)
 
     lr_decay_schedule_generator, lr_decay_schedule_discriminator = get_lr_decay_schedule(args)
 
@@ -80,8 +81,8 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
         hook = partial(at_store_checkpoint_hook, generator=generator)
 
         if args.phase == 'train':
-            GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN, 'SHORTCUT':ProjectiveGAN, 'BOTTLENECK':ProjectiveGAN}
-            gan = GANS[args.discriminator_type](generator=generator, discriminator=discriminator,
+            GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN, 'CLS':ProjectiveGAN}
+            gan = GANS[args.gan_type](generator=generator, discriminator=discriminator,
                                                 lr_decay_schedule_discriminator = lr_decay_schedule_discriminator,
                                                 lr_decay_schedule_generator = lr_decay_schedule_generator,
                                                 **vars(args))
@@ -160,12 +161,12 @@ def get_generator_params(args):
     params.block_sizes = (128, 128) if args.dataset == 'mnist' else (256, 256, 256)
     params.first_block_shape = (7, 7, 256) if args.dataset == 'mnist' else (4, 4, 256)
     params.number_of_classes = 10
-    params.concat_cls = (args.generator_type == "CONCAT")
-    params.conditional_bottleneck = (args.generator_type == "BOTTLENECK")
-    params.unconditional_bottleneck = False
-    params.conditional_shortcut = (args.generator_type == "SHORTCUT")
-    params.unconditional_shortcut = (args.generator_type != "SHORTCUT")
-    params.conditional_bn = (args.generator_type == "COND_BN")
+    params.concat_cls = args.generator_concat_cls
+    params.conditional_bottleneck = 'c' in args.generator_bottleneck
+    params.unconditional_bottleneck = 'u' in args.generator_bottleneck
+    params.conditional_shortcut = 'c' in args.generator_shortcut
+    params.unconditional_shortcut = 'u' in args.generator_shortcut
+    params.conditional_bn = args.generator_cond_bn
 
     params.progressive = args.progressive
     params.progressive_stage = args.progressive_stage
@@ -180,7 +181,7 @@ def get_discriminator_params(args):
     params.block_sizes = (128, 128, 128, 128)
     params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
     params.number_of_classes=10
-    params.norm = args.bn_in_discriminator
+    params.norm = args.discriminator_bn
 
     params.spectral = args.spectral
     params.fully_diff_spectral = args.fully_diff_spectral
@@ -188,11 +189,11 @@ def get_discriminator_params(args):
     params.conv_singular = args.conv_singular
     params.renorm_for_cond_singular = args.renorm_for_cond_singular
 
-    params.type = 'PROJECTIVE'# args.discriminator_type
-    params.conditional_bottleneck = (args.discriminator_type == "BOTTLENECK")
-    params.unconditional_bottleneck = False
-    params.conditional_shortcut = (args.discriminator_type == "SHORTCUT")
-    params.unconditional_shortcut = (args.discriminator_type != "SHORTCUT")
+    params.type = args.gan_type
+    params.conditional_bottleneck = 'c' in args.discriminator_bottleneck
+    params.unconditional_bottleneck = 'u' in args.discriminator_bottleneck
+    params.conditional_shortcut = 'c' in args.discriminator_shortcut
+    params.unconditional_shortcut = 'u' in args.discriminator_shortcut
 
     params.progressive = args.progressive
     params.progressive_stage = args.progressive_stage
@@ -218,14 +219,28 @@ def main():
     parser.add_argument("--spectral_iterations", default=1, type=int, help='Number of iteration per spectral update')
     parser.add_argument("--conv_singular", default=0, type=int, help='Singular convolution layer')
 
-    parser.add_argument("--generator_type", default=None, choices=[None, "CONCAT", "COND_BN", "BOTTLENECK", "SHORTCUT"],
-                        help='Type of generator to use. None for unsuperwised')
-    parser.add_argument("--discriminator_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE', 'BOTTLENECK', 'SHORTCUT'],
-                        help='Type of generator to use. None for unsuperwised')
+    parser.add_argument("--generator_cond_bn", default=0, type=int, help="Use conditional batch norm in generator")
+    parser.add_argument("--generator_concat_cls", default=0, type=int, help='Concat labels to noise in genrator')
+    parser.add_argument("--generator_bottleneck", default='no', choices=['c', 'u', 'uc', 'cu', 'no'],
+                        help='Bottleneck to use in generator u - unconditional.'
+                             'c - conditional, uc - conditional and unconitional'
+                             'no - not use bottlenecks')
+    parser.add_argument("--generator_shortcut", default='u', choices=['c', 'u', 'uc', 'cu'],
+                        help='Shortcut to use in generator u - unconditional. '
+                             'c - conditional, uc - conditional and unconitional')
 
-    parser.add_argument("--uncoditional_bottleneck", default=0, type=int,
-                        help='Use uncoditional conv11 layer in the middle of resblock')
-    parser.add_argument("--bn_in_discriminator", default=0, type=int, help='Use batch nromalization in discriminator')
+    parser.add_argument("--gan_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE', 'CLS'],
+                        help='Type of gan to use. None for unsuperwised.')
+
+    parser.add_argument("--discriminator_bottleneck", default='no', choices=['c', 'u', 'uc', 'cu', 'no'],
+                        help='Bottleneck to use in discriminator u - unconditional.'
+                             'c - conditional, uc - conditional and unconitional'
+                             'no - not use bottlenecks')
+    parser.add_argument("--discriminator_shortcut", default='u', choices=['c', 'u', 'uc', 'cu'],
+                        help='Shortcut to use in discriminator u - unconditional. '
+                             'c - conditional, uc - conditional and unconitional')
+    parser.add_argument("--discriminator_bn", default=0, type=int, help='Use batch nromalization in discriminator')
+
     parser.add_argument("--progressive", default=0, type=int, help='Progresive Growing. In progresive mod run number_of_epochs epochs per each stage.')
     parser.add_argument("--tmp_progresive_checkpoints_dir", default='tmp',
                         help='Folder for intermediate checkpoints for progresive')
@@ -244,12 +259,13 @@ def main():
                         help="Increase lerning rate for conditional layers")
     parser.add_argument("--renorm_for_cond_singular", type=int, default=0,
                         help='If renorm decrease singular value in cond layers accordinnly to number_of_classses')
+    parser.add_argument("--samples_for_evaluation", type=int, default=50000, help='Number of samples for evaluation')
 
     args = parser.parse_args()
 
     dataset = get_dataset(dataset=args.dataset,
                           batch_size=args.batch_size,
-                          supervised=args.generator_type is not None)
+                          supervised=args.gan_type is not None)
 
     args.output_dir = "output/%s_%s" % (args.dataset, time())
     args.checkpoints_dir = args.output_dir
@@ -260,7 +276,7 @@ def main():
 
     args.number_of_stages = 5 if args.dataset == 'mnist' else 7
     args.image_shape = (28, 28, 1) if args.dataset == 'mnist' else (32, 32, 3)
-
+    args.fid_cache_file = "output/%s_fid.npz" % args.dataset
 
     discriminator_params = get_discriminator_params(args)
     generator_params = get_generator_params(args)
