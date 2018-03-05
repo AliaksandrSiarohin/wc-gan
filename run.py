@@ -57,62 +57,34 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
 
     lr_decay_schedule_generator, lr_decay_schedule_discriminator = get_lr_decay_schedule(args)
 
-    def run_stage(stage, generator_checkpoint, discriminator_checkpoint):
-        generator = make_generator(**vars(generator_params))
-        discriminator = make_discriminator(**vars(discriminator_params))
-
-        if args.plot_model:
-            plot_model(generator, os.path.join(args.output_dir, "Generator." + str(stage)))
-            plot_model(generator, os.path.join(args.output_dir, "Discriminator." + str(stage)))
-
-        if args.print_summary:
-            generator.summary()
-            discriminator.summary()
-
-        if args.progressive:
-            print ("Stage number %s" % (stage, ))
-
-        if generator_checkpoint is not None:
-            generator.load_weights(generator_checkpoint, by_name=True)
-
-        if discriminator_checkpoint is not None:
-            discriminator.load_weights(discriminator_checkpoint, by_name=True)
-
-        hook = partial(at_store_checkpoint_hook, generator=generator)
-
-        if args.phase == 'train':
-            GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN, 'CLS':ProjectiveGAN}
-            gan = GANS[args.gan_type](generator=generator, discriminator=discriminator,
-                                                lr_decay_schedule_discriminator = lr_decay_schedule_discriminator,
-                                                lr_decay_schedule_generator = lr_decay_schedule_generator,
-                                                **vars(args))
-
-            args.start_epoch = args.start_epoch + stage * args.number_of_epochs
-
-            trainer = Trainer(dataset, gan, at_store_checkpoint_hook=hook,**vars(args))
-            trainer.train()
-        else:
-            hook(0)
-
-        if args.progressive:
-            if not os.path.exists(args.tmp_progresive_checkpoints_dir):
-                os.makedirs(args.tmp_progresive_checkpoints_dir)
-            generator_checkpoint = os.path.join(args.tmp_progresive_checkpoints_dir, 'generator.' + str(stage))
-            discriminator_checkpoint = os.path.join(args.tmp_progresive_checkpoints_dir, 'discirminator.' + str(stage))
-
-            generator.save_weights(generator_checkpoint)
-            discriminator.save_weights(discriminator_checkpoint)
-
-        return generator_checkpoint, discriminator_checkpoint
-
     generator_checkpoint = args.generator_checkpoint
     discriminator_checkpoint = args.discriminator_checkpoint
 
-    if args.progressive:
-        for stage in range(args.progressive_stage, args.number_of_stages):
-            generator_checkpoint, discriminator_checkpoint = run_stage(stage, generator_checkpoint, discriminator_checkpoint)
+    generator = make_generator(**vars(generator_params))
+    discriminator = make_discriminator(**vars(discriminator_params))
+
+    if args.print_summary:
+        generator.summary()
+        discriminator.summary()
+
+    if generator_checkpoint is not None:
+        generator.load_weights(generator_checkpoint, by_name=True)
+
+    if discriminator_checkpoint is not None:
+        discriminator.load_weights(discriminator_checkpoint, by_name=True)
+
+    hook = partial(at_store_checkpoint_hook, generator=generator)
+
+    if args.phase == 'train':
+        GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN, 'CLS':ProjectiveGAN}
+        gan = GANS[args.gan_type](generator=generator, discriminator=discriminator,
+                                                lr_decay_schedule_discriminator = lr_decay_schedule_discriminator,
+                                                lr_decay_schedule_generator = lr_decay_schedule_generator,
+                                                **vars(args))
+        trainer = Trainer(dataset, gan, at_store_checkpoint_hook=hook,**vars(args))
+        trainer.train()
     else:
-        run_stage(0, generator_checkpoint, discriminator_checkpoint)
+        hook(0)
 
 
 def get_lr_decay_schedule(args):
@@ -171,9 +143,6 @@ def get_generator_params(args):
 
     params.depthwise = args.generator_depthwise
 
-    params.progressive = args.progressive
-    params.progressive_stage = args.progressive_stage
-    params.progressive_iters_per_stage = args.number_of_epochs * 1000
     return params
 
 
@@ -199,10 +168,6 @@ def get_discriminator_params(args):
     params.conditional_shortcut = 'c' in args.discriminator_shortcut
     params.unconditional_shortcut = 'u' in args.discriminator_shortcut
 
-    params.progressive = args.progressive
-    params.progressive_stage = args.progressive_stage
-    params.progressive_iters_per_stage = args.number_of_epochs * 1000
-    
     params.sum_pool = args.sum_pool
     params.depthwise = args.discriminator_depthwise
 
@@ -255,13 +220,9 @@ def main():
     parser.add_argument("--discriminator_filters", default=128, type=int, help='Number of filters in discriminator_block')
     parser.add_argument("--discriminator_depthwise", default=0, type=int, help="Use condtional separable conv in generator")
 
-    parser.add_argument("--progressive", default=0, type=int, help='Progresive Growing. In progresive mod run number_of_epochs epochs per each stage.')
-    parser.add_argument("--tmp_progresive_checkpoints_dir", default='tmp',
-                        help='Folder for intermediate checkpoints for progresive')
-    parser.add_argument("--progressive_stage", default=0, type=int, help='Stage of progressive growing. 0 if train from scratch.')
     parser.add_argument("--compute_inception", default=1, type=int, help='Compute inception score')
     parser.add_argument("--compute_fid", default=1, type=int, help="Compute fid score")
-    parser.add_argument("--plot_model", default=0, type=int)
+
     parser.add_argument("--print_summary", default=1, type=int, help="Print summary of models")
     parser.add_argument("--lr_decay_schedule", default=None, choices=[None, 'linear', 'half-linear', 'linear-end'],
                         help='Learnign rate decay schedule. None - no decay. '

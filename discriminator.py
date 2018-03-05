@@ -5,17 +5,15 @@ from keras.layers import BatchNormalization, Add, Embedding, Concatenate, UpSamp
 from gan.conditional_layers import cond_resblock, ConditionalConv11, ConditionalDense, ConditinalBatchNormalization, get_separable_conditional_conv, ConditionalDepthwiseConv2D
 from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNCondtionalDense, SNEmbeding, SNConditionalDepthwiseConv2D
 from gan.layer_utils import glorot_init, GlobalSumPooling2D
-from generator import Mul
 from functools import partial
 import keras.backend as K
 
 
 def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(128, 128, 128, 128),
-                       resamples=('DOWN', "DOWN", "SAME", "SAME"), number_of_classes=10,
-                       type='AC_GAN', norm=False, conditional_bn=False, spectral=False,
+                       resamples=('DOWN', "DOWN", "SAME", "SAME"),
+                       number_of_classes=10, type='AC_GAN', norm=False, conditional_bn=False, spectral=False,
                        conditional_bottleneck=False, unconditional_bottleneck=False,
                        conditional_shortcut=False, unconditional_shortcut=True,
-                       progressive=False, progressive_stage=0, progressive_iters_per_stage=10000,
                        fully_diff_spectral=False, spectral_iterations=1, conv_singular=True,
                        sum_pool=False, renorm_for_cond_singular=False, depthwise=False):
 
@@ -61,61 +59,19 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
     else:
         norm = lambda axis, name: (lambda inp: inp)
 
+    y = x
+    i = 0
+    for block_size, resample in zip(block_sizes, resamples):
+        input_dim = K.int_shape(y)[-1]
+        uncond_shortcut = (input_dim != block_size) or (resample != "SAME")
+        uncond_shortcut = unconditional_shortcut and uncond_shortcut
 
-    if not progressive:
-        y = x
-        i = 0
-        for block_size, resample in zip(block_sizes, resamples):
-            input_dim = K.int_shape(y)[-1]
-            uncond_shortcut = (input_dim != block_size) or (resample != "SAME")
-            uncond_shortcut = unconditional_shortcut and uncond_shortcut
-
-            y = cond_resblock(y, cls, kernel_size=(3, 3), resample=resample, nfilters=block_size,
-                              number_of_classes=number_of_classes, name='Discriminator.' + str(i), norm=norm,
-                              is_first=(i==0), conv_layer=conv_layer, cond_conv_layer=cond_conv_layer,
-                              cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
-                              cond_shortcut=conditional_shortcut, uncond_shortcut=uncond_shortcut)
-            i += 1
-    else:
-        size_drop = 2 ** (len(block_sizes) - ((progressive_stage + 1) / 2) - 1)
-        print (size_drop)
-        y = AveragePooling2D(pool_size=(size_drop, size_drop))(x)
-
-        current_block = (progressive_stage + 1) / 2
-
-
-        def from_rgb_for_block(block_num):
-             if block_num == len(block_sizes) - 1:
-                 return Conv2D(filters=input_image_shape[-1], kernel_size=(1, 1), name='FromRGB.' + str(block_num))
-             else:
-                 return Conv2D(filters=block_sizes[block_num +1], kernel_size=(1, 1), name='FromRGB.' + str(block_num))
-
-        if progressive_stage % 2 == 0:
-            y = from_rgb_for_block(current_block)(y)
-        else:
-            y_small = AveragePooling2D(pool_size=(2, 2))(y)
-            y_small = from_rgb_for_block(current_block - 1)(y_small)
-            y_large = from_rgb_for_block(current_block)(y)
-
-            y_large = cond_resblock(y_large, cls, kernel_size=(3, 3), resample='DOWN', nfilters=block_sizes[current_block],
-                              number_of_classes=number_of_classes, name='Discriminator.' + str(current_block), norm=norm,
-                              is_first=False, conv_layer=conv_layer, cond_conv_layer=cond_conv_layer,
-                              cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
-                              cond_shortcut=conditional_shortcut, uncond_shortcut=unconditional_shortcut)
-
-            diff = Subtract()([y_small, y_large])
-            diff = Mul(number_of_iters_per_stage=progressive_iters_per_stage, update_count=False)(diff)
-            y = Add()([y_large, diff])
-            current_block -= 1
-
-        for _ in range(current_block + 1):
-            y = cond_resblock(y, cls, kernel_size=(3, 3), resample='DOWN', nfilters=block_sizes[current_block],
-                              number_of_classes=number_of_classes, name='Discriminator.' + str(current_block), norm=norm,
-                              is_first=False, conv_layer=conv_layer, cond_conv_layer=cond_conv_layer,
-                              cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
-                              cond_shortcut=conditional_shortcut, uncond_shortcut=unconditional_shortcut)
-            current_block -= 1
-
+        y = cond_resblock(y, cls, kernel_size=(3, 3), resample=resample, nfilters=block_size,
+                          number_of_classes=number_of_classes, name='Discriminator.' + str(i), norm=norm,
+                          is_first=(i==0), conv_layer=conv_layer, cond_conv_layer=cond_conv_layer,
+                          cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
+                          cond_shortcut=conditional_shortcut, uncond_shortcut=uncond_shortcut)
+        i += 1
 
     y = Activation('relu')(y)
     if sum_pool:
