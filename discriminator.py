@@ -2,7 +2,7 @@ from keras.models import Input, Model
 from keras.layers import Dense, Reshape, Activation, Conv2D, GlobalAveragePooling2D, Lambda
 from keras.layers import BatchNormalization, Add, Embedding, Concatenate, UpSampling2D, AveragePooling2D, Subtract
 
-from gan.conditional_layers import cond_resblock, ConditionalConv11, ConditionalDense, ConditinalBatchNormalization, get_separable_conditional_conv, ConditionalDepthwiseConv2D
+from gan.conditional_layers import cond_resblock, ConditionalConv11, ConditionalDense, ConditinalBatchNormalization, get_separable_conditional_conv, get_separable_conv, ConditionalDepthwiseConv2D
 from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNCondtionalDense, SNEmbeding, SNConditionalDepthwiseConv2D
 from gan.layer_utils import glorot_init, GlobalSumPooling2D
 from functools import partial
@@ -10,12 +10,12 @@ import keras.backend as K
 
 
 def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(128, 128, 128, 128),
-                       resamples=('DOWN', "DOWN", "SAME", "SAME"),
+                       resamples=('DOWN', "DOWN", "SAME", "SAME"), class_agnostic_blocks=4,
                        number_of_classes=10, type='AC_GAN', norm=False, conditional_bn=False, spectral=False,
                        conditional_bottleneck=False, unconditional_bottleneck=False,
                        conditional_shortcut=False, unconditional_shortcut=True,
                        fully_diff_spectral=False, spectral_iterations=1, conv_singular=True,
-                       sum_pool=False, renorm_for_cond_singular=False, depthwise=False):
+                       sum_pool=False, renorm_for_cond_singular=False):
 
     assert conditional_shortcut or unconditional_shortcut
     assert len(block_sizes) == len(resamples)
@@ -45,11 +45,6 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         emb_layer = Embedding
         depthwise_layer = ConditionalDepthwiseConv2D
 
-    if depthwise:
-        conv_layer = partial(get_separable_conditional_conv, cls=cls, conv_layer=conv_layer,
-                             conditional_conv_layer=cond_conv_layer, number_of_classes=number_of_classes)
-
-
     if norm:
         if conditional_bn:
             norm = lambda axis, name: (lambda inp: ConditinalBatchNormalization(number_of_classes=number_of_classes,
@@ -71,6 +66,24 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
                           is_first=(i==0), conv_layer=conv_layer, cond_conv_layer=cond_conv_layer,
                           cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
                           cond_shortcut=conditional_shortcut, uncond_shortcut=uncond_shortcut)
+        if i == class_agnostic_blocks - 1:
+            y_c = y
+        i += 1
+
+
+    conv_layer_cls = partial(get_separable_conv, number_of_classes=number_of_classes, cls=cls,
+                                                 conv_layer=depthwise_layer, conv11_layer=cond_conv_layer,
+                                                 conditional_conv11=True, conditional_conv=True)
+
+    for block_size, resample in zip(block_sizes[class_agnostic_blocks:], resamples[class_agnostic_blocks:]):
+        input_dim = K.int_shape(y)[-1]
+        uncond_shortcut = (input_dim != block_size) or (resample != "SAME")
+
+        y_c = cond_resblock(y_c, cls, kernel_size=(3, 3), resample=resample, nfilters=block_size,
+                          number_of_classes=number_of_classes, name='CDiscriminator.' + str(i), norm=norm,
+                          is_first=(i==0), conv_layer=conv_layer_cls, cond_conv_layer=None,
+                          cond_bottleneck=False, uncond_bottleneck=False,
+                          cond_shortcut=False, uncond_shortcut=uncond_shortcut)
         i += 1
 
     y = Activation('relu')(y)
@@ -94,8 +107,14 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         out = dence_layer(units=1, use_bias=True, kernel_initializer=glorot_init)(y)
         return Model(inputs=[x], outputs=[out])
     else:
+        y_c = Activation('relu')(y_c)
+        if sum_pool:
+            y_c = GlobalSumPooling2D()(y_c)
+        else:
+            y_c = GlobalAveragePooling2D()(y_c)
+
         out_phi = cond_dence_layer(units=1, name='Discriminator.dence_cond_', number_of_classes=number_of_classes,
-                               use_bias=True, kernel_initializer=glorot_init)([y, cls])
+                               use_bias=True, kernel_initializer=glorot_init)([y_c, cls])
         out_psi = dence_layer(units=1, use_bias=True, kernel_initializer=glorot_init)(y)
         out = Add()([out_phi, out_psi])
         return Model(inputs=[x,cls], outputs=[out])

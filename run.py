@@ -132,6 +132,7 @@ def get_generator_params(args):
     params.input_cls_shape = (1, )
     params.block_sizes = tuple([args.generator_filters] * 2) if args.dataset == 'mnist' else tuple([args.generator_filters] * 3)
     params.first_block_shape = (7, 7, args.generator_first_filters) if args.dataset == 'mnist' else (4, 4, args.generator_first_filters)
+    params.resamples = ("UP", "UP") if args.dataset == 'mnist' else ("UP", "UP", "UP")
     params.number_of_classes = 10
     params.concat_cls = args.generator_concat_cls
     params.conditional_bottleneck = 'c' in args.generator_bottleneck
@@ -140,8 +141,6 @@ def get_generator_params(args):
     params.unconditional_shortcut = 'u' in args.generator_shortcut
     params.norm = args.generator_bn != 'n'
     params.conditional_bn = args.generator_bn == 'c'
-
-    params.depthwise = args.generator_depthwise
 
     return params
 
@@ -169,7 +168,7 @@ def get_discriminator_params(args):
     params.unconditional_shortcut = 'u' in args.discriminator_shortcut
 
     params.sum_pool = args.sum_pool
-    params.depthwise = args.discriminator_depthwise
+    params.class_agnostic_blocks = args.discriminator_agnostic_blocks
 
     return params
 
@@ -219,6 +218,7 @@ def main():
                         help='Batch nromalization in discriminator. c - conditional, u - unconditional, n - none')
     parser.add_argument("--discriminator_filters", default=128, type=int, help='Number of filters in discriminator_block')
     parser.add_argument("--discriminator_depthwise", default=0, type=int, help="Use condtional separable conv in generator")
+    parser.add_argument("--discriminator_agnostic_blocks", default=4, type=int, help="Number of blocks that is share in discriminator.")
 
     parser.add_argument("--compute_inception", default=1, type=int, help='Compute inception score')
     parser.add_argument("--compute_fid", default=1, type=int, help="Compute fid score")
