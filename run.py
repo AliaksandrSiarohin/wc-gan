@@ -92,7 +92,7 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
             trainer = Trainer(dataset, gan, at_store_checkpoint_hook=hook,**vars(args))
             trainer.train()
         else:
-            at_store_checkpoint_hook()
+            hook(0)
 
         if args.progressive:
             if not os.path.exists(args.tmp_progresive_checkpoints_dir):
@@ -158,15 +158,16 @@ def get_generator_params(args):
     params = Namespace()
     params.output_channels = 1 if args.dataset == 'mnist' else 3
     params.input_cls_shape = (1, )
-    params.block_sizes = (128, 128) if args.dataset == 'mnist' else (256, 256, 256)
-    params.first_block_shape = (7, 7, 256) if args.dataset == 'mnist' else (4, 4, 256)
+    params.block_sizes = (128, 128) if args.dataset == 'mnist' else (128, 128, 128)
+    params.first_block_shape = (7, 7, 256) if args.dataset == 'mnist' else (4, 4, 128)
     params.number_of_classes = 10
     params.concat_cls = args.generator_concat_cls
     params.conditional_bottleneck = 'c' in args.generator_bottleneck
     params.unconditional_bottleneck = 'u' in args.generator_bottleneck
     params.conditional_shortcut = 'c' in args.generator_shortcut
     params.unconditional_shortcut = 'u' in args.generator_shortcut
-    params.conditional_bn = args.generator_cond_bn
+    params.norm = args.generator_bn != 'n'
+    params.conditional_bn = args.generator_bn == 'c'
 
     params.progressive = args.progressive
     params.progressive_stage = args.progressive_stage
@@ -181,7 +182,8 @@ def get_discriminator_params(args):
     params.block_sizes = (128, 128, 128, 128)
     params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
     params.number_of_classes=10
-    params.norm = args.discriminator_bn
+    params.norm = args.discriminator_bn != 'n'
+    params.conditional_bn = args.discriminator_bn == 'c'
 
     params.spectral = args.spectral
     params.fully_diff_spectral = args.fully_diff_spectral
@@ -219,7 +221,8 @@ def main():
     parser.add_argument("--spectral_iterations", default=1, type=int, help='Number of iteration per spectral update')
     parser.add_argument("--conv_singular", default=0, type=int, help='Singular convolution layer')
 
-    parser.add_argument("--generator_cond_bn", default=0, type=int, help="Use conditional batch norm in generator")
+    parser.add_argument("--generator_bn", default='u', choices=['c', 'u', 'n'],
+                        help='Batch nromalization in generator. c - conditional, u - unconditional, n - none')
     parser.add_argument("--generator_concat_cls", default=0, type=int, help='Concat labels to noise in genrator')
     parser.add_argument("--generator_bottleneck", default='no', choices=['c', 'u', 'uc', 'cu', 'no'],
                         help='Bottleneck to use in generator u - unconditional.'
@@ -239,7 +242,9 @@ def main():
     parser.add_argument("--discriminator_shortcut", default='u', choices=['c', 'u', 'uc', 'cu'],
                         help='Shortcut to use in discriminator u - unconditional. '
                              'c - conditional, uc - conditional and unconitional')
-    parser.add_argument("--discriminator_bn", default=0, type=int, help='Use batch nromalization in discriminator')
+    parser.add_argument("--discriminator_bn", default='n', choices=['c', 'u', 'n'],
+                        help='Batch nromalization in discriminator. c - conditional, u - unconditional, n - none')
+
 
     parser.add_argument("--progressive", default=0, type=int, help='Progresive Growing. In progresive mod run number_of_epochs epochs per each stage.')
     parser.add_argument("--tmp_progresive_checkpoints_dir", default='tmp',
@@ -252,13 +257,13 @@ def main():
     parser.add_argument("--lr_decay_schedule", default=None, choices=[None, 'linear', 'half-linear', 'linear-end'],
                         help='Learnign rate decay schedule. None - no decay. '
                              'linear - linear decay to zero. half-linear - linear decay to 0.5'
-			            'linear-end constant until 0.9, then linear decay to 0')
+                             'linear-end constant until 0.9, then linear decay to 0')
     parser.add_argument("--sum_pool", default=0, type=int,
                         help='Use sum or average pooling')
     parser.add_argument("--conditional_optimizer", type=int, default=0,
                         help="Increase lerning rate for conditional layers")
     parser.add_argument("--renorm_for_cond_singular", type=int, default=0,
-                        help='If renorm decrease singular value in cond layers accordinnly to number_of_classses')
+                        help='If compute one sigma per conditional filter. Otherwise compute number_of_classes sigma.')
     parser.add_argument("--samples_for_evaluation", type=int, default=50000, help='Number of samples for evaluation')
 
     args = parser.parse_args()

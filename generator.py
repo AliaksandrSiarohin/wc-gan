@@ -2,7 +2,6 @@ from keras.models import Input, Model
 from keras.layers import Dense, Reshape, Activation, Conv2D, GlobalAveragePooling2D, Layer
 from keras.layers import BatchNormalization, Add, Embedding, Concatenate, UpSampling2D, AveragePooling2D, Subtract
 
-
 import numpy as np
 from gan.layer_utils import glorot_init
 
@@ -33,7 +32,7 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
                    first_block_shape=(4, 4, 128), number_of_classes=10, concat_cls=False,
                    conditional_bottleneck=False, unconditional_bottleneck=False,
                    conditional_shortcut=False, unconditional_shortcut=True,
-                   conditional_bn=False, progressive=False, progressive_stage=0, progressive_iters_per_stage=10000):
+                   conditional_bn=False, norm=True, progressive=False, progressive_stage=0, progressive_iters_per_stage=10000):
 
     assert conditional_shortcut or unconditional_shortcut
 
@@ -50,21 +49,24 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
     y = Dense(np.prod(first_block_shape), kernel_initializer=glorot_init)(y)
     y = Reshape(first_block_shape)(y)
 
-    if conditional_bn:
-        norm = lambda axis, name: (lambda inp: ConditinalBatchNormalization(number_of_classes=number_of_classes,
-                                                                                axis=axis, name=name)([inp, cls]))
+    if norm:
+        if conditional_bn:
+            norm_layer = lambda axis, name: (lambda inp: ConditinalBatchNormalization(number_of_classes=number_of_classes,
+                                                                                    axis=axis, name=name)([inp, cls]))
+        else:
+            norm_layer = BatchNormalization
     else:
-        norm = BatchNormalization
+        norm_layer = lambda axis, name: (lambda inp: inp)
 
 
     if not progressive:
         for i, block_size in enumerate(block_sizes):
             y = cond_resblock(y, cls, kernel_size=(3, 3), resample="UP", nfilters=block_size, number_of_classes=number_of_classes,
-                          name='Generator.' + str(i), norm=norm, is_first=False, conv_layer=Conv2D, cond_conv_layer=ConditionalConv11,
+                          name='Generator.' + str(i), norm=norm_layer, is_first=False, conv_layer=Conv2D, cond_conv_layer=ConditionalConv11,
                           cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
                           cond_shortcut=conditional_shortcut, uncond_shortcut=unconditional_shortcut)
-
-        y = BatchNormalization(axis=-1)(y)
+        if norm:
+            y = BatchNormalization(axis=-1)(y)
         y = Activation('relu')(y)
         output = Conv2D(output_channels, (3, 3), kernel_initializer=glorot_init, use_bias=True, padding='same', activation='tanh')(y)
     else:
@@ -74,7 +76,7 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
 
         for i, block_size in enumerate(block_sizes):
             y = cond_resblock(y, cls, kernel_size=(3, 3), resample="UP", nfilters=block_size, number_of_classes=number_of_classes,
-                          name='Generator.' + str(i), norm=norm, is_first=False, conv_layer=Conv2D, cond_conv_layer=ConditionalConv11,
+                          name='Generator.' + str(i), norm=norm_layer, is_first=False, conv_layer=Conv2D, cond_conv_layer=ConditionalConv11,
                           cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
                           cond_shortcut=conditional_shortcut, uncond_shortcut=unconditional_shortcut)
             ys.append(y)
