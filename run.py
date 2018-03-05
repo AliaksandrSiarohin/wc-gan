@@ -158,8 +158,8 @@ def get_generator_params(args):
     params = Namespace()
     params.output_channels = 1 if args.dataset == 'mnist' else 3
     params.input_cls_shape = (1, )
-    params.block_sizes = (128, 128) if args.dataset == 'mnist' else (128, 128, 128)
-    params.first_block_shape = (7, 7, 256) if args.dataset == 'mnist' else (4, 4, 128)
+    params.block_sizes = tuple([args.generator_filters] * 2) if args.dataset == 'mnist' else tuple([args.generator_filters] * 3)
+    params.first_block_shape = (7, 7, args.generator_first_filters) if args.dataset == 'mnist' else (4, 4, args.generator_first_filters)
     params.number_of_classes = 10
     params.concat_cls = args.generator_concat_cls
     params.conditional_bottleneck = 'c' in args.generator_bottleneck
@@ -168,6 +168,8 @@ def get_generator_params(args):
     params.unconditional_shortcut = 'u' in args.generator_shortcut
     params.norm = args.generator_bn != 'n'
     params.conditional_bn = args.generator_bn == 'c'
+
+    params.depthwise = args.generator_depthwise
 
     params.progressive = args.progressive
     params.progressive_stage = args.progressive_stage
@@ -179,7 +181,7 @@ def get_discriminator_params(args):
     params = Namespace()
     params.input_image_shape = args.image_shape
     params.input_cls_shape = (1, )
-    params.block_sizes = (128, 128, 128, 128)
+    params.block_sizes = tuple([args.discriminator_filters] * 4)
     params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
     params.number_of_classes=10
     params.norm = args.discriminator_bn != 'n'
@@ -202,6 +204,7 @@ def get_discriminator_params(args):
     params.progressive_iters_per_stage = args.number_of_epochs * 1000
     
     params.sum_pool = args.sum_pool
+    params.depthwise = args.discriminator_depthwise
 
     return params
 
@@ -231,6 +234,11 @@ def main():
     parser.add_argument("--generator_shortcut", default='u', choices=['c', 'u', 'uc', 'cu'],
                         help='Shortcut to use in generator u - unconditional. '
                              'c - conditional, uc - conditional and unconitional')
+    parser.add_argument("--generator_filters", default=256, type=int,help='Number of filters in generator_block')
+    parser.add_argument("--generator_first_filters", default=256,
+                        type=int, help='Number of filters in first generator_block')
+    parser.add_argument("--generator_depthwise", default=0, type=int, help="Use condtional separable conv in generator")
+
 
     parser.add_argument("--gan_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE', 'CLS'],
                         help='Type of gan to use. None for unsuperwised.')
@@ -244,7 +252,8 @@ def main():
                              'c - conditional, uc - conditional and unconitional')
     parser.add_argument("--discriminator_bn", default='n', choices=['c', 'u', 'n'],
                         help='Batch nromalization in discriminator. c - conditional, u - unconditional, n - none')
-
+    parser.add_argument("--discriminator_filters", default=128, type=int, help='Number of filters in discriminator_block')
+    parser.add_argument("--discriminator_depthwise", default=0, type=int, help="Use condtional separable conv in generator")
 
     parser.add_argument("--progressive", default=0, type=int, help='Progresive Growing. In progresive mod run number_of_epochs epochs per each stage.')
     parser.add_argument("--tmp_progresive_checkpoints_dir", default='tmp',
@@ -265,6 +274,8 @@ def main():
     parser.add_argument("--renorm_for_cond_singular", type=int, default=0,
                         help='If compute one sigma per conditional filter. Otherwise compute number_of_classes sigma.')
     parser.add_argument("--samples_for_evaluation", type=int, default=50000, help='Number of samples for evaluation')
+
+    parser.add_argument("--depthwise", type=int, default=1, help='DepthwiseGenerator')
 
     args = parser.parse_args()
 

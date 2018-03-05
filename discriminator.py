@@ -2,12 +2,13 @@ from keras.models import Input, Model
 from keras.layers import Dense, Reshape, Activation, Conv2D, GlobalAveragePooling2D, Lambda
 from keras.layers import BatchNormalization, Add, Embedding, Concatenate, UpSampling2D, AveragePooling2D, Subtract
 
-from gan.conditional_layers import cond_resblock, ConditionalConv11, ConditionalDense, ConditinalBatchNormalization
-from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNCondtionalDense, SNEmbeding
+from gan.conditional_layers import cond_resblock, ConditionalConv11, ConditionalDense, ConditinalBatchNormalization, get_separable_conditional_conv, ConditionalDepthwiseConv2D
+from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNCondtionalDense, SNEmbeding, SNConditionalDepthwiseConv2D
 from gan.layer_utils import glorot_init, GlobalSumPooling2D
 from generator import Mul
 from functools import partial
 import keras.backend as K
+
 
 def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(128, 128, 128, 128),
                        resamples=('DOWN', "DOWN", "SAME", "SAME"), number_of_classes=10,
@@ -16,7 +17,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
                        conditional_shortcut=False, unconditional_shortcut=True,
                        progressive=False, progressive_stage=0, progressive_iters_per_stage=10000,
                        fully_diff_spectral=False, spectral_iterations=1, conv_singular=True,
-                       sum_pool=False, renorm_for_cond_singular=False):
+                       sum_pool=False, renorm_for_cond_singular=False, depthwise=False):
 
     assert conditional_shortcut or unconditional_shortcut
     assert len(block_sizes) == len(resamples)
@@ -36,12 +37,20 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         dence_layer = partial(SNDense,
                               fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
         emb_layer = partial(SNEmbeding, fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
+        depthwise_layer = partial(SNConditionalDepthwiseConv2D,
+                                  fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
     else:
         conv_layer = Conv2D
         cond_dence_layer = ConditionalDense
         cond_conv_layer = ConditionalConv11
         dence_layer = Dense
         emb_layer = Embedding
+        depthwise_layer = ConditionalDepthwiseConv2D
+
+    if depthwise:
+        conv_layer = partial(get_separable_conditional_conv, cls=cls, conv_layer=conv_layer,
+                             conditional_conv_layer=depthwise_layer, number_of_classes=number_of_classes)
+
 
     if norm:
         if conditional_bn:

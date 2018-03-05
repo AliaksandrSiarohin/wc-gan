@@ -5,9 +5,10 @@ from keras.layers import BatchNormalization, Add, Embedding, Concatenate, UpSamp
 import numpy as np
 from gan.layer_utils import glorot_init
 
-from gan.conditional_layers import ConditinalBatchNormalization, cond_resblock, ConditionalConv11
+from gan.conditional_layers import ConditinalBatchNormalization, cond_resblock, ConditionalConv11, get_separable_conditional_conv
 
 import keras.backend as K
+from functools import partial
 
 
 class Mul(Layer):
@@ -27,16 +28,17 @@ class Mul(Layer):
     def reset():
         K.set_value(Mul.ITER_COUNT, 0)
 
-
 def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=(1, ), block_sizes=(128, 128, 128),
                    first_block_shape=(4, 4, 128), number_of_classes=10, concat_cls=False,
                    conditional_bottleneck=False, unconditional_bottleneck=False,
                    conditional_shortcut=False, unconditional_shortcut=True,
-                   conditional_bn=False, norm=True, progressive=False, progressive_stage=0, progressive_iters_per_stage=10000):
+                   conditional_bn=False, norm=True, progressive=False, progressive_stage=0,
+                   progressive_iters_per_stage=10000, depthwise=False):
 
     assert conditional_shortcut or unconditional_shortcut
 
-
+    print first_block_shape
+    print block_sizes
     inp = Input(input_noise_shape)
     cls = Input(input_cls_shape, dtype='int32')
 
@@ -58,17 +60,24 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
     else:
         norm_layer = lambda axis, name: (lambda inp: inp)
 
+    if depthwise:
+        conv_layer = partial(get_separable_conditional_conv, cls=cls,
+                         number_of_classes=number_of_classes)
+    else:
+        conv_layer = Conv2D
 
     if not progressive:
         for i, block_size in enumerate(block_sizes):
             y = cond_resblock(y, cls, kernel_size=(3, 3), resample="UP", nfilters=block_size, number_of_classes=number_of_classes,
-                          name='Generator.' + str(i), norm=norm_layer, is_first=False, conv_layer=Conv2D, cond_conv_layer=ConditionalConv11,
+                          name='Generator.' + str(i), norm=norm_layer, is_first=False, conv_layer=conv_layer, cond_conv_layer=ConditionalConv11,
                           cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
                           cond_shortcut=conditional_shortcut, uncond_shortcut=unconditional_shortcut)
         if norm:
             y = BatchNormalization(axis=-1)(y)
         y = Activation('relu')(y)
-        output = Conv2D(output_channels, (3, 3), kernel_initializer=glorot_init, use_bias=True, padding='same', activation='tanh')(y)
+        output = conv_layer(filters=output_channels, kernel_size=(3, 3), name='Generator.Final',
+                            kernel_initializer=glorot_init, use_bias=True, padding='same')(y)
+        output = Activation('tanh')(output)
     else:
         ys = []
         torgbs = []
@@ -76,12 +85,13 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
 
         for i, block_size in enumerate(block_sizes):
             y = cond_resblock(y, cls, kernel_size=(3, 3), resample="UP", nfilters=block_size, number_of_classes=number_of_classes,
-                          name='Generator.' + str(i), norm=norm_layer, is_first=False, conv_layer=Conv2D, cond_conv_layer=ConditionalConv11,
+                          name='Generator.' + str(i), norm=norm_layer, is_first=False, conv_layer=conv_layer, cond_conv_layer=ConditionalConv11,
                           cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
                           cond_shortcut=conditional_shortcut, uncond_shortcut=unconditional_shortcut)
             ys.append(y)
             torgb = Activation('relu')(y)
-            torgb = Conv2D(filters=output_channels, kernel_size=(1, 1), activation='tanh', name='ToRGB.' + str(i))(torgb)
+            torgb = conv_layer(filters=output_channels, kernel_size=(1, 1), name='ToRGB.' + str(i))(torgb)
+            torgb = Activation('tanh')(output)
             torgbs.append(torgb)
 
         if progressive_stage % 2 == 0:
@@ -100,7 +110,7 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
             output = UpSampling2D(size=(size_mul, size_mul))(output)
 
 
-    no_lables = (not conditional_bn) and (not conditional_bottleneck) and (not concat_cls) and (not conditional_shortcut)
+    no_lables = (not conditional_bn) and (not conditional_bottleneck) and (not concat_cls) and (not conditional_shortcut) and (not depthwise)
     if no_lables:
         return Model(inputs=[inp], outputs=output)
     else:
