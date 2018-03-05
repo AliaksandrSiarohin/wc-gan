@@ -2,7 +2,7 @@ from gan.inception_score import get_inception_score
 from gan.fid import calculate_fid_given_arrays
 import numpy as np
 from tqdm import tqdm
-
+import keras.backend as K
 
 def compute_scores(epoch, image_shape, generator, dataset, number_of_images=50000, compute_inception=True, compute_fid=True,
                    log_file=None, cache_file='mnist_fid.npz', additional_info=""):
@@ -11,6 +11,7 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
     images = np.empty((number_of_images, ) + image_shape)
     previous_batsh_size = dataset._batch_size
     dataset._batch_size = 100
+
     for i in tqdm(range(0, number_of_images, 100)):
         g_s = dataset.next_generator_sample_test()
         images[i:(i+100)] = generator.predict(g_s)
@@ -18,6 +19,7 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
     images += 127.5
     dataset._batch_size = previous_batsh_size
 
+    K.set_learning_phase(0)
     def to_rgb(array):
         if array.shape[-1] != 3:
             #hack for grayscale mnist

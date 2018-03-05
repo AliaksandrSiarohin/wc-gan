@@ -57,7 +57,7 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
                             kernel_initializer=glorot_init, use_bias=True, padding='same')(y)
     output = Activation('tanh')(output)
 
-    no_lables = (not conditional_bn) and (not conditional_bottleneck) and (not concat_cls) and (not conditional_shortcut) and (not depthwise)
+    no_lables = (not conditional_bn) and (not conditional_bottleneck) and (not concat_cls) and (not conditional_shortcut)
     if no_lables:
         return Model(inputs=[inp], outputs=output)
     else:
