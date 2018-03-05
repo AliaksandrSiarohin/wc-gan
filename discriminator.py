@@ -49,7 +49,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
 
     if depthwise:
         conv_layer = partial(get_separable_conditional_conv, cls=cls, conv_layer=conv_layer,
-                             conditional_conv_layer=depthwise_layer, number_of_classes=number_of_classes)
+                             conditional_conv_layer=cond_conv_layer, number_of_classes=number_of_classes)
 
 
     if norm:

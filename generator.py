@@ -91,7 +91,7 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
             ys.append(y)
             torgb = Activation('relu')(y)
             torgb = conv_layer(filters=output_channels, kernel_size=(1, 1), name='ToRGB.' + str(i))(torgb)
-            torgb = Activation('tanh')(output)
+            torgb = Activation('tanh')(torgb)
             torgbs.append(torgb)
 
         if progressive_stage % 2 == 0:
