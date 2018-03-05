@@ -214,7 +214,7 @@ def main():
     parser.add_argument("--phase", choices=['train', 'test'], default='train')
     parser.add_argument("--generator_batch_multiple", default=2, type=int,
                         help="Size of the generator batch, multiple of batch_size.")
-    parser.add_argument("--lr", default=2e-4, type=float, help="Learning rate")
+    parser.add_argument("--lr", default=5e-4, type=float, help="Learning rate")
     parser.add_argument("--beta1", default=0, type=float, help='Adam parameter')
     parser.add_argument("--beta2", default=0.9, type=float, help='Adam parameter')
     parser.add_argument("--dataset", default='mnist', choices=['mnist', 'cifar10'], help='Dataset to train on')
@@ -267,7 +267,7 @@ def main():
                         help='Learnign rate decay schedule. None - no decay. '
                              'linear - linear decay to zero. half-linear - linear decay to 0.5'
                              'linear-end constant until 0.9, then linear decay to 0')
-    parser.add_argument("--sum_pool", default=0, type=int,
+    parser.add_argument("--sum_pool", default=1, type=int,
                         help='Use sum or average pooling')
     parser.add_argument("--conditional_optimizer", type=int, default=0,
                         help="Increase lerning rate for conditional layers")
