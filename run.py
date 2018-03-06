@@ -201,7 +201,6 @@ def main():
     parser.add_argument("--generator_filters", default=256, type=int,help='Number of filters in generator_block')
     parser.add_argument("--generator_first_filters", default=256,
                         type=int, help='Number of filters in first generator_block')
-    parser.add_argument("--generator_depthwise", default=0, type=int, help="Use condtional separable conv in generator")
 
 
     parser.add_argument("--gan_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE', 'CLS'],
@@ -217,7 +216,6 @@ def main():
     parser.add_argument("--discriminator_bn", default='n', choices=['c', 'u', 'n'],
                         help='Batch nromalization in discriminator. c - conditional, u - unconditional, n - none')
     parser.add_argument("--discriminator_filters", default=128, type=int, help='Number of filters in discriminator_block')
-    parser.add_argument("--discriminator_depthwise", default=0, type=int, help="Use condtional separable conv in generator")
     parser.add_argument("--discriminator_agnostic_blocks", default=4, type=int, help="Number of blocks that is share in discriminator.")
 
     parser.add_argument("--compute_inception", default=1, type=int, help='Compute inception score')
@@ -235,8 +233,6 @@ def main():
     parser.add_argument("--renorm_for_cond_singular", type=int, default=0,
                         help='If compute one sigma per conditional filter. Otherwise compute number_of_classes sigma.')
     parser.add_argument("--samples_for_evaluation", type=int, default=50000, help='Number of samples for evaluation')
-
-    parser.add_argument("--depthwise", type=int, default=1, help='DepthwiseGenerator')
 
     args = parser.parse_args()
 
