@@ -142,7 +142,7 @@ def get_generator_params(args):
     params.unconditional_shortcut = 'u' in args.generator_shortcut
     params.norm = args.generator_bn != 'n'
     params.conditional_bn = args.generator_bn == 'c'
-    parasm.cls_branch = args.generator_cls_branch
+    params.cls_branch = args.generator_cls_branch
 
     return params
 
@@ -169,7 +169,7 @@ def get_discriminator_params(args):
     params.conditional_shortcut = 'c' in args.discriminator_shortcut
     params.unconditional_shortcut = 'u' in args.discriminator_shortcut
 
-    parasm.cls_branch = args.discriminator_cls_branch
+    params.cls_branch = args.discriminator_cls_branch
 
     params.sum_pool = args.sum_pool
     params.class_agnostic_blocks = args.discriminator_agnostic_blocks
