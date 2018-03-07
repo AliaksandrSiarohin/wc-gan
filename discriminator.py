@@ -15,7 +15,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
                        conditional_bottleneck=False, unconditional_bottleneck=False,
                        conditional_shortcut=False, unconditional_shortcut=True,
                        fully_diff_spectral=False, spectral_iterations=1, conv_singular=True,
-                       sum_pool=False, renorm_for_cond_singular=False):
+                       sum_pool=False, renorm_for_cond_singular=False, cls_branch=False):
 
     assert conditional_shortcut or unconditional_shortcut
     assert len(block_sizes) == len(resamples)
@@ -54,6 +54,10 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
     else:
         norm = lambda axis, name: (lambda inp: inp)
 
+    conv_layer_cls = partial(get_separable_conv, number_of_classes=number_of_classes, cls=cls,
+                                                 conv_layer=depthwise_layer, conv11_layer=cond_conv_layer,
+                                                 conditional_conv11=True, conditional_conv=True)
+
     y = x
     i = 0
     for block_size, resample in zip(block_sizes, resamples):
@@ -65,15 +69,14 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
                           number_of_classes=number_of_classes, name='Discriminator.' + str(i), norm=norm,
                           is_first=(i==0), conv_layer=conv_layer, cond_conv_layer=cond_conv_layer,
                           cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
-                          cond_shortcut=conditional_shortcut, uncond_shortcut=uncond_shortcut)
+                          cond_shortcut=conditional_shortcut, uncond_shortcut=uncond_shortcut,
+                          cls_conv=conv_layer_cls if cls_branch else None)
         if i == class_agnostic_blocks - 1:
             y_c = y
         i += 1
 
 
-    conv_layer_cls = partial(get_separable_conv, number_of_classes=number_of_classes, cls=cls,
-                                                 conv_layer=depthwise_layer, conv11_layer=cond_conv_layer,
-                                                 conditional_conv11=True, conditional_conv=True)
+
 
     for block_size, resample in zip(block_sizes[class_agnostic_blocks:], resamples[class_agnostic_blocks:]):
         input_dim = K.int_shape(y)[-1]

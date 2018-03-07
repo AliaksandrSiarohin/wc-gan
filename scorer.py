@@ -19,7 +19,6 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
     images += 127.5
     dataset._batch_size = previous_batsh_size
 
-    K.set_learning_phase(0)
     def to_rgb(array):
         if array.shape[-1] != 3:
             #hack for grayscale mnist
@@ -34,7 +33,7 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
             with open(log_file, 'a') as f:
                 print >>f, ("Epoch %s " % (epoch, )) + str + " " + additional_info
     if compute_fid:
-        true_images = 127.5 * dataset._X + 127.5
+        true_images = 127.5 * dataset._X_test + 127.5
         str = "FID SCORE: %s" % calculate_fid_given_arrays([to_rgb(true_images)[:number_of_images],
                                                             to_rgb(images)[:number_of_images]], cache_file=cache_file)
         print (str)

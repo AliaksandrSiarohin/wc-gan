@@ -34,7 +34,8 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size = (128, )):
         from cifar10 import load_data
         (X, y), (X_test, y_test) = load_data()
 
-    return LabeledArrayDataset(X=X, y=y if supervised else None, batch_size=batch_size, noise_size=noise_size)
+    return LabeledArrayDataset(X=X, y=y if supervised else None, X_test=X_test, y_test=y_test,
+                               batch_size=batch_size, noise_size=noise_size)
 
 
 def compile_and_run(dataset, args, generator_params, discriminator_params):
@@ -141,6 +142,7 @@ def get_generator_params(args):
     params.unconditional_shortcut = 'u' in args.generator_shortcut
     params.norm = args.generator_bn != 'n'
     params.conditional_bn = args.generator_bn == 'c'
+    parasm.cls_branch = args.generator_cls_branch
 
     return params
 
@@ -167,6 +169,8 @@ def get_discriminator_params(args):
     params.conditional_shortcut = 'c' in args.discriminator_shortcut
     params.unconditional_shortcut = 'u' in args.discriminator_shortcut
 
+    parasm.cls_branch = args.discriminator_cls_branch
+
     params.sum_pool = args.sum_pool
     params.class_agnostic_blocks = args.discriminator_agnostic_blocks
 
@@ -181,7 +185,7 @@ def main():
     parser.add_argument("--lr", default=5e-4, type=float, help="Learning rate")
     parser.add_argument("--beta1", default=0, type=float, help='Adam parameter')
     parser.add_argument("--beta2", default=0.9, type=float, help='Adam parameter')
-    parser.add_argument("--dataset", default='mnist', choices=['mnist', 'cifar10'], help='Dataset to train on')
+    parser.add_argument("--dataset", default='cifar10', choices=['mnist', 'cifar10'], help='Dataset to train on')
 
     parser.add_argument("--spectral", default=0, type=int, help='Use spectral norm in discriminator')
     parser.add_argument("--fully_diff_spectral", default=0, type=int, help='Fully difirentiable spectral normalization')
@@ -201,6 +205,7 @@ def main():
     parser.add_argument("--generator_filters", default=256, type=int,help='Number of filters in generator_block')
     parser.add_argument("--generator_first_filters", default=256,
                         type=int, help='Number of filters in first generator_block')
+    parser.add_argument("--generator_cls_branch", default=0, type=int, help="Use classifier branch in generator")
 
 
     parser.add_argument("--gan_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE', 'CLS'],
@@ -216,7 +221,9 @@ def main():
     parser.add_argument("--discriminator_bn", default='n', choices=['c', 'u', 'n'],
                         help='Batch nromalization in discriminator. c - conditional, u - unconditional, n - none')
     parser.add_argument("--discriminator_filters", default=128, type=int, help='Number of filters in discriminator_block')
-    parser.add_argument("--discriminator_agnostic_blocks", default=4, type=int, help="Number of blocks that is share in discriminator.")
+    parser.add_argument("--discriminator_agnostic_blocks", default=4, type=int,
+                        help="Number of blocks that is share in discriminator.")
+    parser.add_argument("--discriminator_cls_branch", default=0, type=int, help="Use classifier branch in generator")
 
     parser.add_argument("--compute_inception", default=1, type=int, help='Compute inception score')
     parser.add_argument("--compute_fid", default=1, type=int, help="Compute fid score")
