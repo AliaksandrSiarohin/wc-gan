@@ -173,6 +173,7 @@ def get_discriminator_params(args):
 
     params.sum_pool = args.sum_pool
     params.class_agnostic_blocks = args.discriminator_agnostic_blocks
+    params.agnostic_stream = args.discriminator_agnostic_stream
 
     return params
 
@@ -224,6 +225,8 @@ def main():
     parser.add_argument("--discriminator_agnostic_blocks", default=4, type=int,
                         help="Number of blocks that is share in discriminator.")
     parser.add_argument("--discriminator_cls_branch", default=0, type=int, help="Use classifier branch in generator")
+    parser.add_argument("--discriminator_agnostic_stream", type=int, default=1,
+                        help='Use cls agnostic stream in discriminator of CLS type')
 
     parser.add_argument("--compute_inception", default=1, type=int, help='Compute inception score')
     parser.add_argument("--compute_fid", default=1, type=int, help="Compute fid score")
@@ -233,6 +236,7 @@ def main():
                         help='Learnign rate decay schedule. None - no decay. '
                              'linear - linear decay to zero. half-linear - linear decay to 0.5'
                              'linear-end constant until 0.9, then linear decay to 0')
+
     parser.add_argument("--sum_pool", default=1, type=int,
                         help='Use sum or average pooling')
     parser.add_argument("--conditional_optimizer", type=int, default=0,

@@ -15,7 +15,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
                        conditional_bottleneck=False, unconditional_bottleneck=False,
                        conditional_shortcut=False, unconditional_shortcut=True,
                        fully_diff_spectral=False, spectral_iterations=1, conv_singular=True,
-                       sum_pool=False, renorm_for_cond_singular=False, cls_branch=False):
+                       sum_pool=False, renorm_for_cond_singular=False, cls_branch=False, agnostic_stream=False):
 
     assert conditional_shortcut or unconditional_shortcut
     assert len(block_sizes) == len(resamples)
@@ -85,8 +85,6 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         i += 1
 
 
-
-
     for block_size, resample in zip(block_sizes[class_agnostic_blocks:], resamples[class_agnostic_blocks:]):
         input_dim = K.int_shape(y)[-1]
         uncond_shortcut = (input_dim != block_size) or (resample != "SAME")
@@ -107,7 +105,6 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
     if type == 'AC_GAN':
         cls_out = Dense(units=number_of_classes, use_bias=True, kernel_initializer=glorot_init)(y)
         out = dence_layer(units=1, use_bias=True, kernel_initializer=glorot_init)(y)
-
         return Model(inputs=x, outputs=[out, cls_out])
     elif type == "PROJECTIVE":
         emb = emb_layer(input_dim = number_of_classes, output_dim = block_sizes[-1])(cls)
@@ -129,5 +126,8 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
 
         out_phi = Lambda(lambda inp: K.sum(inp[1] * K.expand_dims(inp[0], axis=1), axis=2), output_shape=(1, ))([y_c, emb])
         out_psi = dence_layer(units=1, use_bias=True, kernel_initializer=glorot_init)(y)
-        out = Add()([out_phi, out_psi])
+        if agnostic_stream:
+            out = Add()([out_phi, out_psi])
+        else:
+            out = out_phi
         return Model(inputs=[x,cls], outputs=[out])
