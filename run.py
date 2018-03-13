@@ -60,7 +60,8 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
 
     generator_checkpoint = args.generator_checkpoint
     discriminator_checkpoint = args.discriminator_checkpoint
-
+    from keras.models import load_model
+    #generator = load_model(generator_checkpoint)
     generator = make_generator(**vars(generator_params))
     discriminator = make_discriminator(**vars(discriminator_params))
 
@@ -140,8 +141,10 @@ def get_generator_params(args):
     params.unconditional_bottleneck = 'u' in args.generator_bottleneck
     params.conditional_shortcut = 'c' in args.generator_shortcut
     params.unconditional_shortcut = 'u' in args.generator_shortcut
-    params.norm = args.generator_bn != 'n'
-    params.conditional_bn = args.generator_bn == 'c'
+
+    params.norm = args.generator_bn
+    params.after_norm = args.generator_after_norm
+
     params.cls_branch = args.generator_cls_branch
 
     return params
@@ -154,8 +157,9 @@ def get_discriminator_params(args):
     params.block_sizes = tuple([args.discriminator_filters] * 4)
     params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
     params.number_of_classes=10
-    params.norm = args.discriminator_bn != 'n'
-    params.conditional_bn = args.discriminator_bn == 'c'
+
+    params.norm = args.discriminator_bn
+    params.after_norm = args.discriminator_after_norm
 
     params.spectral = args.spectral
     params.fully_diff_spectral = args.fully_diff_spectral
@@ -193,8 +197,14 @@ def main():
     parser.add_argument("--spectral_iterations", default=1, type=int, help='Number of iteration per spectral update')
     parser.add_argument("--conv_singular", default=0, type=int, help='Singular convolution layer')
 
-    parser.add_argument("--generator_bn", default='u', choices=['c', 'u', 'n'],
-                        help='Batch nromalization in generator. c - conditional, u - unconditional, n - none')
+    parser.add_argument("--generator_bn", default='u', choices=['n', 'cb', 'd', 'ub'],
+                        help='Batch normalization in generator. cb - conditional batch,'
+                             ' ub - unconditional batch, n - none.'
+                             'conv - conv11 after uncoditional, d - decorelation.')
+    parser.add_argument("--generator_after_norm", default='n', choices=['cs', 'conv', 'n'],
+                        help="Cond layer after normalization. cs - center scale, conv - conditional conv11."
+                             " n - None")
+
     parser.add_argument("--generator_concat_cls", default=0, type=int, help='Concat labels to noise in genrator')
     parser.add_argument("--generator_bottleneck", default='no', choices=['c', 'u', 'uc', 'cu', 'no'],
                         help='Bottleneck to use in generator u - unconditional.'
@@ -208,7 +218,6 @@ def main():
                         type=int, help='Number of filters in first generator_block')
     parser.add_argument("--generator_cls_branch", default=0, type=int, help="Use classifier branch in generator")
 
-
     parser.add_argument("--gan_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE', 'CLS'],
                         help='Type of gan to use. None for unsuperwised.')
 
@@ -219,8 +228,15 @@ def main():
     parser.add_argument("--discriminator_shortcut", default='u', choices=['c', 'u', 'uc', 'cu'],
                         help='Shortcut to use in discriminator u - unconditional. '
                              'c - conditional, uc - conditional and unconitional')
-    parser.add_argument("--discriminator_bn", default='n', choices=['c', 'u', 'n'],
-                        help='Batch nromalization in discriminator. c - conditional, u - unconditional, n - none')
+
+    parser.add_argument("--discriminator_bn", default='n', choices=['n', 'cb', 'd', 'ub'],
+                        help='Batch normalization in discriminator. cb - conditional batch,'
+                             ' ub - unconditional batch, n - none.'
+                             'conv - conv11 after uncoditional, d - decorelation.')
+    parser.add_argument("--discriminator_after_norm", default='n', choices=['cs', 'conv', 'n'],
+                        help="Cond layer after normalization. cs - center scale, conv - conditional conv11."
+                             " n - None")
+
     parser.add_argument("--discriminator_filters", default=128, type=int, help='Number of filters in discriminator_block')
     parser.add_argument("--discriminator_agnostic_blocks", default=4, type=int,
                         help="Number of blocks that is share in discriminator.")
@@ -244,6 +260,9 @@ def main():
     parser.add_argument("--renorm_for_cond_singular", type=int, default=0,
                         help='If compute one sigma per conditional filter. Otherwise compute number_of_classes sigma.')
     parser.add_argument("--samples_for_evaluation", type=int, default=50000, help='Number of samples for evaluation')
+
+    parser.add_argument("--concatenate_generator_batches", type=int, default=True,
+                        help='Concatenate batches in generator or use multiple batches')
 
     args = parser.parse_args()
 

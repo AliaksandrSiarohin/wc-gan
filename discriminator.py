@@ -2,7 +2,8 @@ from keras.models import Input, Model
 from keras.layers import Dense, Reshape, Activation, Conv2D, GlobalAveragePooling2D, Lambda
 from keras.layers import BatchNormalization, Add, Embedding, Concatenate, UpSampling2D, AveragePooling2D, Subtract
 
-from gan.conditional_layers import cond_resblock, ConditionalConv11, ConditionalDense, ConditinalBatchNormalization, get_separable_conditional_conv, get_separable_conv, ConditionalDepthwiseConv2D
+from gan.conditional_layers import cond_resblock, ConditionalConv11, ConditionalDense, ConditionalCenterScale,\
+                                        get_separable_conv, ConditionalDepthwiseConv2D, DecorelationNormalization
 from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNCondtionalDense, SNEmbeding, SNConditionalDepthwiseConv2D, SNConditionalConv2D, ConditionalConv2D
 from gan.layer_utils import glorot_init, GlobalSumPooling2D
 from functools import partial
@@ -11,7 +12,7 @@ import keras.backend as K
 
 def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(128, 128, 128, 128),
                        resamples=('DOWN', "DOWN", "SAME", "SAME"), class_agnostic_blocks=4,
-                       number_of_classes=10, type='AC_GAN', norm=False, conditional_bn=False, spectral=False,
+                       number_of_classes=10, type='AC_GAN', norm='n', after_norm='n', spectral=False,
                        conditional_bottleneck=False, unconditional_bottleneck=False,
                        conditional_shortcut=False, unconditional_shortcut=True,
                        fully_diff_spectral=False, spectral_iterations=1, conv_singular=True,
@@ -37,9 +38,6 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         emb_layer = partial(SNEmbeding, fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
         depthwise_layer = partial(SNConditionalDepthwiseConv2D,
                                   fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
-        # conv_layer_cls1 = partial(SNConditionalConv2D, fully_diff_spectral=fully_diff_spectral,
-        #                          spectral_iterations=spectral_iterations, renormalize=renorm_for_cond_singular,
-        #                          number_of_classes=number_of_classes)
     else:
         conv_layer = Conv2D
         cond_dence_layer = ConditionalDense
@@ -47,26 +45,39 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         dence_layer = Dense
         emb_layer = Embedding
         depthwise_layer = ConditionalDepthwiseConv2D
-        # conv_layer_cls1 = ConditionalConv2D
 
-    # def conv_layer_cls_fn(**kwargs):
-    #     def f(x):
-    #         return conv_layer_cls1(**kwargs)([x, cls])
-    #     return f
+    assert norm in ['n', 'cb', 'd', 'ub']
+    assert after_norm in ['cs', 'conv', 'n']
+    if norm == 'n':
+        norm_layer = lambda axis, name: (lambda inp: inp)
+    elif norm == 'cb':
+        norm_layer = lambda axis, name: BatchNormalization(axis=axis, center=False, scale=False, name=name)
+    elif norm == 'ub':
+        norm_layer = BatchNormalization
+    elif norm == 'd':
+        norm_layer = lambda axis, name: DecorelationNormalization(name=name)
 
-    if norm:
-        if conditional_bn:
-            norm = lambda axis, name: (lambda inp: ConditinalBatchNormalization(number_of_classes=number_of_classes,
-                                                                                    axis=axis, name=name)([inp, cls]))
-        else:
-            norm = BatchNormalization
-    else:
-        norm = lambda axis, name: (lambda inp: inp)
+    if after_norm == 'cs':
+        after_norm_layer =  lambda axis, name: lambda x: ConditionalCenterScale(number_of_classes=number_of_classes,
+                                                                     axis=axis, name=name)([x, cls])
+    elif after_norm == 'conv':
+        after_norm_layer = lambda axis, name: lambda x: cond_conv_layer(number_of_classes=number_of_classes,
+                                                        axis=axis, name=name, filters=K.int_shape(x)[axis])([x, cls])
+    elif after_norm == 'n':
+        after_norm_layer = lambda axis, name: lambda x: x
+
+    def bn(axis, name):
+        def stack(inp):
+            out = inp
+            out = norm_layer(axis=axis, name=name + '_npart')(out)
+            out = after_norm_layer(axis=axis, name=name + '_repart')(out)
+            return out
+        return stack
+
 
     conv_layer_cls = partial(get_separable_conv, number_of_classes=number_of_classes, cls=cls,
                                                 conv_layer=depthwise_layer, conv11_layer=cond_conv_layer,
                                                 conditional_conv11=True, conditional_conv=True)
-    #conv_layer_cls = conv_layer_cls_fn
     y = x
     i = 0
     for block_size, resample in zip(block_sizes, resamples):
@@ -75,7 +86,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         uncond_shortcut = unconditional_shortcut and uncond_shortcut
 
         y = cond_resblock(y, cls, kernel_size=(3, 3), resample=resample, nfilters=block_size,
-                          number_of_classes=number_of_classes, name='Discriminator.' + str(i), norm=norm,
+                          number_of_classes=number_of_classes, name='Discriminator.' + str(i), norm=bn,
                           is_first=(i==0), conv_layer=conv_layer, cond_conv_layer=cond_conv_layer,
                           cond_bottleneck=conditional_bottleneck, uncond_bottleneck=unconditional_bottleneck,
                           cond_shortcut=conditional_shortcut, uncond_shortcut=uncond_shortcut,
@@ -90,7 +101,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         uncond_shortcut = (input_dim != block_size) or (resample != "SAME")
 
         y_c = cond_resblock(y_c, cls, kernel_size=(3, 3), resample=resample, nfilters=block_size,
-                          number_of_classes=number_of_classes, name='CDiscriminator.' + str(i), norm=norm,
+                          number_of_classes=number_of_classes, name='CDiscriminator.' + str(i), norm=bn,
                           is_first=(i==0), conv_layer=conv_layer_cls, cond_conv_layer=None,
                           cond_bottleneck=False, uncond_bottleneck=False,
                           cond_shortcut=False, uncond_shortcut=uncond_shortcut)

@@ -4,6 +4,7 @@ import numpy as np
 from tqdm import tqdm
 import keras.backend as K
 
+
 def compute_scores(epoch, image_shape, generator, dataset, number_of_images=50000, compute_inception=True, compute_fid=True,
                    log_file=None, cache_file='mnist_fid.npz', additional_info=""):
     if not (compute_inception or compute_fid):
@@ -12,9 +13,18 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
     previous_batsh_size = dataset._batch_size
     dataset._batch_size = 100
 
-    for i in tqdm(range(0, number_of_images, 100)):
+    generator_input = generator.get_input_at(0)
+    if type(generator_input) != list:
+        generator_input = [generator_input]
+    print generator_input
+
+    predict_fn = K.function(generator_input + [K.learning_phase()], [generator.get_output_at(0)])
+
+    for i in tqdm(range(0, number_of_images + 64, 64)):
         g_s = dataset.next_generator_sample_test()
-        images[i:(i+100)] = generator.predict(g_s)
+        images[i:(i+100)] = predict_fn(g_s + [False])[0]
+
+    images = images[:number_of_images]
     images *= 127.5
     images += 127.5
     dataset._batch_size = previous_batsh_size
