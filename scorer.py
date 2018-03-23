@@ -10,8 +10,6 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
     if not (compute_inception or compute_fid):
         return
     images = np.empty((number_of_images, ) + image_shape)
-    previous_batsh_size = dataset._batch_size
-    dataset._batch_size = 100
 
     generator_input = generator.get_input_at(0)
     if type(generator_input) != list:
@@ -20,14 +18,14 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
 
     predict_fn = K.function(generator_input + [K.learning_phase()], [generator.get_output_at(0)])
 
-    for i in tqdm(range(0, number_of_images + 64, 64)):
+    for begin in tqdm(range(0, number_of_images, dataset._batch_size)):
+        end = min(number_of_images, begin + dataset._batch_size)
+        n_images = end - begin
         g_s = dataset.next_generator_sample_test()
-        images[i:(i+100)] = predict_fn(g_s + [False])[0]
+        images[begin:end] = predict_fn(g_s + [False])[0][:n_images]
 
-    images = images[:number_of_images]
     images *= 127.5
     images += 127.5
-    dataset._batch_size = previous_batsh_size
 
     def to_rgb(array):
         if array.shape[-1] != 3:

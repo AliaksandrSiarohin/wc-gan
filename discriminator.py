@@ -62,7 +62,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
                                                                      axis=axis, name=name)([x, cls])
     elif after_norm == 'conv':
         after_norm_layer = lambda axis, name: lambda x: cond_conv_layer(number_of_classes=number_of_classes,
-                                                        axis=axis, name=name, filters=K.int_shape(x)[axis])([x, cls])
+                                                                name=name, filters=K.int_shape(x)[axis])([x, cls])
     elif after_norm == 'n':
         after_norm_layer = lambda axis, name: lambda x: x
 

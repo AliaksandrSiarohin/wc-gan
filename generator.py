@@ -6,7 +6,7 @@ import numpy as np
 from gan.layer_utils import glorot_init
 
 from gan.conditional_layers import ConditinalBatchNormalization, cond_resblock, ConditionalConv11, ConditionalDepthwiseConv2D, get_separable_conv,\
-                                   DecorelationNormalization, ConditionalCenterScale
+                                   DecorelationNormalization, ConditionalCenterScale, CenterScale
 
 import keras.backend as K
 from functools import partial
@@ -38,7 +38,7 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
 
 
     assert norm in ['n', 'cb', 'd', 'ub']
-    assert after_norm in ['cs', 'conv', 'n']
+    assert after_norm in [ 'ucs', 'cs', 'conv', 'n']
     if norm == 'n':
         norm_layer = lambda axis, name: (lambda inp: inp)
     elif norm == 'cb':
@@ -49,11 +49,19 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
         norm_layer = lambda axis, name: DecorelationNormalization(name=name)
 
     if after_norm == 'cs':
-        after_norm_layer =  lambda axis, name: lambda x: ConditionalCenterScale(number_of_classes=number_of_classes,
+        after_norm_layer = lambda axis, name: lambda x: ConditionalCenterScale(number_of_classes=number_of_classes,
                                                                      axis=axis, name=name)([x, cls])
+    elif after_norm == 'ucs':
+        def after_norm_layer(axis, name):
+            def f(x):
+                c = ConditionalCenterScale(number_of_classes=number_of_classes, axis=axis, name=name + '_c')([x, cls])
+                u = CenterScale(axis=axis, name=name + '_u')(x)
+                out = Add(name=name + '_a')([c, u])
+                return out
+            return f
     elif after_norm == 'conv':
         after_norm_layer = lambda axis, name: lambda x: ConditionalConv11(number_of_classes=number_of_classes,
-                                                        axis=axis, name=name, filters=K.int_shape(x)[axis])([x, cls])
+                                                                name=name, filters=K.int_shape(x)[axis])([x, cls])
     elif after_norm == 'n':
         after_norm_layer = lambda axis, name: lambda x: x
 

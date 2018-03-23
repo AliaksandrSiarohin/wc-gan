@@ -201,7 +201,7 @@ def main():
                         help='Batch normalization in generator. cb - conditional batch,'
                              ' ub - unconditional batch, n - none.'
                              'conv - conv11 after uncoditional, d - decorelation.')
-    parser.add_argument("--generator_after_norm", default='n', choices=['cs', 'conv', 'n'],
+    parser.add_argument("--generator_after_norm", default='n', choices=['cs', 'ucs', 'conv', 'n'],
                         help="Cond layer after normalization. cs - center scale, conv - conditional conv11."
                              " n - None")
 
