@@ -17,7 +17,7 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
                    first_block_shape=(4, 4, 128), number_of_classes=10, concat_cls=False,
                    conditional_bottleneck=False, unconditional_bottleneck=False,
                    conditional_shortcut=False, unconditional_shortcut=True,
-                   norm='u', after_norm='cs', cls_branch=False):
+                   norm='u', after_norm='cs', cls_branch=False, renorm_for_decor=False):
 
     assert conditional_shortcut or unconditional_shortcut
 
@@ -37,21 +37,21 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
     y = Reshape(first_block_shape)(y)
 
 
-    assert norm in ['n', 'cb', 'd', 'ub']
-    assert after_norm in [ 'ucs', 'cs', 'conv', 'n']
+    assert norm in ['n', 'b', 'd']
+    assert after_norm in [ 'ucs', 'ccs', 'uccs', 'uconv', 'cconv', 'ucconv', 'n']
     if norm == 'n':
         norm_layer = lambda axis, name: (lambda inp: inp)
-    elif norm == 'cb':
+    elif norm == 'b':
         norm_layer = lambda axis, name: BatchNormalization(axis=axis, center=False, scale=False, name=name)
-    elif norm == 'ub':
-        norm_layer = BatchNormalization
     elif norm == 'd':
-        norm_layer = lambda axis, name: DecorelationNormalization(name=name)
+        norm_layer = lambda axis, name: DecorelationNormalization(name=name, renorm=renorm_for_decor)
 
-    if after_norm == 'cs':
+    if after_norm == 'ccs':
         after_norm_layer = lambda axis, name: lambda x: ConditionalCenterScale(number_of_classes=number_of_classes,
                                                                      axis=axis, name=name)([x, cls])
     elif after_norm == 'ucs':
+        after_norm_layer = lambda axis, name: lambda x: CenterScale(axis=axis, name=name)(x)
+    elif after_norm == 'uccs':
         def after_norm_layer(axis, name):
             def f(x):
                 c = ConditionalCenterScale(number_of_classes=number_of_classes, axis=axis, name=name + '_c')([x, cls])
@@ -59,9 +59,21 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
                 out = Add(name=name + '_a')([c, u])
                 return out
             return f
-    elif after_norm == 'conv':
-        after_norm_layer = lambda axis, name: lambda x: ConditionalConv11(number_of_classes=number_of_classes,
-                                                                name=name, filters=K.int_shape(x)[axis])([x, cls])
+    elif after_norm == 'cconv':
+        after_norm_layer = lambda axis, name: lambda x: ConditionalConv11(filters=K.int_shape(x)[axis],
+                                                                          number_of_classes=number_of_classes,
+                                                                          name=name)([x, cls])
+    elif after_norm == 'uconv':
+        after_norm_layer = lambda axis, name: lambda x: Conv2D(kernel_size=(1, 1),
+                                                               filters=K.int_shape(x)[axis], name=name)([x, cls])
+    elif after_norm == 'ucconv':
+        def after_norm_layer(axis, name):
+            def f(x):
+                c = ConditionalConv11(number_of_classes=number_of_classes, name=name + '_c', filters=K.int_shape(x)[axis])([x, cls])
+                u = Conv2D(kernel_size=(1, 1), filters=K.int_shape(x)[axis], name=name + '_u')(x)
+                out = Add(name=name + '_a')([c, u])
+                return out
+            return f
     elif after_norm == 'n':
         after_norm_layer = lambda axis, name: lambda x: x
 

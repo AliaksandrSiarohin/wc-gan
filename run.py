@@ -142,6 +142,8 @@ def get_generator_params(args):
     params.conditional_shortcut = 'c' in args.generator_shortcut
     params.unconditional_shortcut = 'u' in args.generator_shortcut
 
+    params.renorm_for_decor = args.generator_renorm_for_decor
+
     params.norm = args.generator_bn
     params.after_norm = args.generator_after_norm
 
@@ -178,6 +180,7 @@ def get_discriminator_params(args):
     params.sum_pool = args.sum_pool
     params.class_agnostic_blocks = args.discriminator_agnostic_blocks
     params.agnostic_stream = args.discriminator_agnostic_stream
+    params.dropout = args.discriminator_dropout
 
     return params
 
@@ -201,9 +204,10 @@ def main():
                         help='Batch normalization in generator. cb - conditional batch,'
                              ' ub - unconditional batch, n - none.'
                              'conv - conv11 after uncoditional, d - decorelation.')
-    parser.add_argument("--generator_after_norm", default='n', choices=['cs', 'ucs', 'conv', 'n'],
+    parser.add_argument("--generator_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv','n'],
                         help="Cond layer after normalization. cs - center scale, conv - conditional conv11."
                              " n - None")
+    parser.add_argument("-generator_renorm_for_decor", default=0, type=int, help='Renorm for decorelation normalization')
 
     parser.add_argument("--generator_concat_cls", default=0, type=int, help='Concat labels to noise in genrator')
     parser.add_argument("--generator_bottleneck", default='no', choices=['c', 'u', 'uc', 'cu', 'no'],
@@ -263,6 +267,7 @@ def main():
 
     parser.add_argument("--concatenate_generator_batches", type=int, default=True,
                         help='Concatenate batches in generator or use multiple batches')
+    parser.add_argument("--discriminator_dropout", type=float, default=0, help="Use dropout in discriminator")
 
     args = parser.parse_args()
 

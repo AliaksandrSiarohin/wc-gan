@@ -1,5 +1,5 @@
 from keras.models import Input, Model
-from keras.layers import Dense, Reshape, Activation, Conv2D, GlobalAveragePooling2D, Lambda
+from keras.layers import Dense, Reshape, Activation, Conv2D, GlobalAveragePooling2D, Lambda, Dropout
 from keras.layers import BatchNormalization, Add, Embedding, Concatenate, UpSampling2D, AveragePooling2D, Subtract
 
 from gan.conditional_layers import cond_resblock, ConditionalConv11, ConditionalDense, ConditionalCenterScale,\
@@ -16,7 +16,8 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
                        conditional_bottleneck=False, unconditional_bottleneck=False,
                        conditional_shortcut=False, unconditional_shortcut=True,
                        fully_diff_spectral=False, spectral_iterations=1, conv_singular=True,
-                       sum_pool=False, renorm_for_cond_singular=False, cls_branch=False, agnostic_stream=False):
+                       sum_pool=False, renorm_for_cond_singular=False, cls_branch=False, agnostic_stream=False,
+                       dropout = False):
 
     assert conditional_shortcut or unconditional_shortcut
     assert len(block_sizes) == len(resamples)
@@ -112,6 +113,9 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
         y = GlobalSumPooling2D()(y)
     else: 
         y = GlobalAveragePooling2D()(y)
+
+    if dropout != 0:
+        y = Dropout(dropout)(y)
 
     if type == 'AC_GAN':
         cls_out = Dense(units=number_of_classes, use_bias=True, kernel_initializer=glorot_init)(y)
