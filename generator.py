@@ -99,7 +99,7 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
                           cls_conv=conv_layer_cls if cls_branch else None)
         i += 1
 
-    y = bn(axis=-1, name='Generator.BN.Final')(y)
+    y = bn(axis=-1, name='Generator.BN.Final')(y) #BatchNormalization(axis=-1, name='Generator.BN.Final')(y)
     y = Activation('relu')(y)
     output = Conv2D(filters=output_channels, kernel_size=(3, 3), name='Generator.Final',
                             kernel_initializer=glorot_init, use_bias=True, padding='same')(y)
