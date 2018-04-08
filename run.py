@@ -200,7 +200,7 @@ def main():
     parser.add_argument("--spectral_iterations", default=1, type=int, help='Number of iteration per spectral update')
     parser.add_argument("--conv_singular", default=0, type=int, help='Singular convolution layer')
 
-    parser.add_argument("--generator_bn", default='u', choices=['n', 'cb', 'd', 'ub'],
+    parser.add_argument("--generator_bn", default='u', choices=['n', 'b', 'd'],
                         help='Batch normalization in generator. cb - conditional batch,'
                              ' ub - unconditional batch, n - none.'
                              'conv - conv11 after uncoditional, d - decorelation.')
