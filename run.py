@@ -141,11 +141,16 @@ def get_generator_params(args):
     params.unconditional_bottleneck = 'u' in args.generator_bottleneck
     params.conditional_shortcut = 'c' in args.generator_shortcut
     params.unconditional_shortcut = 'u' in args.generator_shortcut
+    params.triangular_cond_conv = args.generator_triangular_cond_conv
 
     params.renorm_for_decor = args.generator_renorm_for_decor
 
-    params.norm = args.generator_bn
-    params.after_norm = args.generator_after_norm
+    params.block_norm = args.generator_block_norm
+    params.block_after_norm = args.generator_block_after_norm
+
+    params.last_norm = args.generator_last_norm
+    params.last_after_norm = args.generator_last_after_norm
+    params.gan_type = args.gan_type
 
     params.cls_branch = args.generator_cls_branch
 
@@ -200,13 +205,20 @@ def main():
     parser.add_argument("--spectral_iterations", default=1, type=int, help='Number of iteration per spectral update')
     parser.add_argument("--conv_singular", default=0, type=int, help='Singular convolution layer')
 
-    parser.add_argument("--generator_bn", default='u', choices=['n', 'b', 'd'],
-                        help='Batch normalization in generator. cb - conditional batch,'
+    parser.add_argument("--generator_block_norm", default='u', choices=['n', 'b', 'd'],
+                        help='Batch normalization in generator resblock. cb - conditional batch,'
                              ' ub - unconditional batch, n - none.'
                              'conv - conv11 after uncoditional, d - decorelation.')
-    parser.add_argument("--generator_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv','n'],
-                        help="Cond layer after normalization. cs - center scale, conv - conditional conv11."
-                             " n - None")
+    parser.add_argument("--generator_block_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv','n'],
+                        help="Layer after normalization")
+
+    parser.add_argument("--generator_last_norm", default='b', choices=['n', 'b', 'd'],
+                        help='Batch normalization in generator last. cb - conditional batch,'
+                             ' ub - unconditional batch, n - none.'
+                             'conv - conv11 after uncoditional, d - decorelation.')
+    parser.add_argument("--generator_last_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv','n'],
+                        help="Layer after normalization")
+
     parser.add_argument("-generator_renorm_for_decor", default=0, type=int, help='Renorm for decorelation normalization')
 
     parser.add_argument("--generator_concat_cls", default=0, type=int, help='Concat labels to noise in genrator')
@@ -221,6 +233,8 @@ def main():
     parser.add_argument("--generator_first_filters", default=256,
                         type=int, help='Number of filters in first generator_block')
     parser.add_argument("--generator_cls_branch", default=0, type=int, help="Use classifier branch in generator")
+    parser.add_argument("--generator_triangular_cond_conv", default=0,
+                        type=int, help="Use triangular conditional conv11")
 
     parser.add_argument("--gan_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE', 'CLS'],
                         help='Type of gan to use. None for unsuperwised.')

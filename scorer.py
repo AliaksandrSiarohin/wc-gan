@@ -17,11 +17,15 @@ def compute_scores(epoch, image_shape, generator, dataset, number_of_images=5000
     print generator_input
 
     predict_fn = K.function(generator_input + [K.learning_phase()], [generator.get_output_at(0)])
-
-    for begin in tqdm(range(0, number_of_images, dataset._batch_size)):
-        end = min(number_of_images, begin + dataset._batch_size)
+    
+    bs = dataset._batch_size
+    #dataset._batch_size = bs
+    for begin in tqdm(range(0, number_of_images, bs)):
+        
+        end = min(number_of_images, begin + bs)
         n_images = end - begin
         g_s = dataset.next_generator_sample_test()
+        
         images[begin:end] = predict_fn(g_s + [False])[0][:n_images]
 
     images *= 127.5
