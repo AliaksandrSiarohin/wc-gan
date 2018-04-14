@@ -24,15 +24,24 @@ from keras.backend import tf as ktf
 
 
 def get_dataset(dataset, batch_size, supervised = False, noise_size = (128, )):
-    assert dataset in ['mnist', 'cifar10']
+    assert dataset in ['mnist', 'cifar10', 'cifar100', 'fashion-mnist']
 
     if dataset == 'mnist':
         from keras.datasets import mnist
         (X, y), (X_test, y_test) = mnist.load_data()
         X = X.reshape((X.shape[0], X.shape[1], X.shape[2], 1))
+        X_test = X_test.reshape((X_test.shape[0], X_test.shape[1], X_test.shape[2], 1))
     elif dataset == 'cifar10':
         from cifar10 import load_data
         (X, y), (X_test, y_test) = load_data()
+    elif dataset == 'cifar100':
+        from cifar100 import load_data
+        (X, y), (X_test, y_test) = load_data()
+    elif dataset == 'fashion-mnist':
+        from fashion_mnist import load_data
+        (X, y), (X_test, y_test) = load_data()
+        X = X.reshape((X.shape[0], X.shape[1], X.shape[2], 1))
+        X_test = X_test.reshape((X_test.shape[0], X_test.shape[1], X_test.shape[2], 1))
 
     return LabeledArrayDataset(X=X, y=y if supervised else None, X_test=X_test, y_test=y_test,
                                batch_size=batch_size, noise_size=noise_size)
@@ -40,34 +49,27 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size = (128, )):
 
 def compile_and_run(dataset, args, generator_params, discriminator_params):
     additional_info = json.dumps(vars(args))
-    if not args.conditional_optimizer:
-        args.generator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
-        args.discriminator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
-    else:
-        args.generator_optimizer = ConditionalAdamOptimizer(number_of_classes=generator_params.number_of_classes,
-                                                            lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
-        args.discriminator_optimizer = ConditionalAdamOptimizer(number_of_classes=discriminator_params.number_of_classes,
-                                                             lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
+
+    args.generator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
+    args.discriminator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
 
     log_file = os.path.join(args.output_dir, 'log.txt')
 
     at_store_checkpoint_hook = partial(compute_scores, image_shape=args.image_shape, log_file=log_file,
-                                       dataset=dataset, compute_inception=args.compute_inception,
-                                       compute_fid=args.compute_fid, additional_info=additional_info,
-                                       number_of_images=args.samples_for_evaluation, cache_file=args.fid_cache_file)
+                                       dataset=dataset, images_inception=args.samples_inception,
+                                       images_fid=args.samples_fid, additional_info=additional_info,
+                                       cache_file=args.fid_cache_file)
 
     lr_decay_schedule_generator, lr_decay_schedule_discriminator = get_lr_decay_schedule(args)
 
     generator_checkpoint = args.generator_checkpoint
     discriminator_checkpoint = args.discriminator_checkpoint
-    from keras.models import load_model
-    #generator = load_model(generator_checkpoint)
+
     generator = make_generator(**vars(generator_params))
     discriminator = make_discriminator(**vars(discriminator_params))
 
-    if args.print_summary:
-        generator.summary()
-        discriminator.summary()
+    generator.summary()
+    discriminator.summary()
 
     if generator_checkpoint is not None:
         generator.load_weights(generator_checkpoint, by_name=True)
@@ -78,7 +80,7 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
     hook = partial(at_store_checkpoint_hook, generator=generator)
 
     if args.phase == 'train':
-        GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN, 'CLS':ProjectiveGAN}
+        GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN}
         gan = GANS[args.gan_type](generator=generator, discriminator=discriminator,
                                                 lr_decay_schedule_discriminator = lr_decay_schedule_discriminator,
                                                 lr_decay_schedule_generator = lr_decay_schedule_generator,
@@ -130,18 +132,22 @@ def get_lr_decay_schedule(args):
 
 def get_generator_params(args):
     params = Namespace()
-    params.output_channels = 1 if args.dataset == 'mnist' else 3
+    params.output_channels = 1 if args.dataset.endswith('mnist') else 3
     params.input_cls_shape = (1, )
-    params.block_sizes = tuple([args.generator_filters] * 2) if args.dataset == 'mnist' else tuple([args.generator_filters] * 3)
-    params.first_block_shape = (7, 7, args.generator_first_filters) if args.dataset == 'mnist' else (4, 4, args.generator_first_filters)
-    params.resamples = ("UP", "UP") if args.dataset == 'mnist' else ("UP", "UP", "UP")
-    params.number_of_classes = 10
+    if args.arch == 'res':
+        params.block_sizes = tuple([args.generator_filters] * 2) if args.dataset.endswith('mnist') else tuple([args.generator_filters] * 3)
+        params.first_block_shape = (7, 7, args.generator_filters) if args.dataset.endswith('mnist') else (4, 4, args.generator_filters)
+        params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
+    else:
+        params.block_sizes = ([args.generator_filters, args.generator_filters / 2] if args.dataset.endswith('mnist')
+                              else [args.generator_filters, args.generator_filters / 2, args.generator_filters / 4])
+        params.first_block_shape = (7, 7, args.generator_filters) if args.dataset.endswith('mnist') else (4, 4, args.generator_filters)
+        params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
+    params.number_of_classes = 10 if args.dataset != 'cifar100' else 100
+
     params.concat_cls = args.generator_concat_cls
-    params.conditional_bottleneck = 'c' in args.generator_bottleneck
-    params.unconditional_bottleneck = 'u' in args.generator_bottleneck
-    params.conditional_shortcut = 'c' in args.generator_shortcut
-    params.unconditional_shortcut = 'u' in args.generator_shortcut
-    params.triangular_cond_conv = args.generator_triangular_cond_conv
+
+    params.triangular_conv = args.triangular_conv
 
     params.renorm_for_decor = args.generator_renorm_for_decor
 
@@ -150,10 +156,8 @@ def get_generator_params(args):
 
     params.last_norm = args.generator_last_norm
     params.last_after_norm = args.generator_last_after_norm
+
     params.gan_type = args.gan_type
-
-    params.cls_branch = args.generator_cls_branch
-
     return params
 
 
@@ -161,31 +165,31 @@ def get_discriminator_params(args):
     params = Namespace()
     params.input_image_shape = args.image_shape
     params.input_cls_shape = (1, )
-    params.block_sizes = tuple([args.discriminator_filters] * 4)
-    params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
-    params.number_of_classes=10
+    if args.arch == 'res':
+        params.block_sizes = tuple([args.discriminator_filters] * 4)
+        params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
+    else:
+        params.block_sizes = [args.discriminator_filters / 8, args.discriminator_filters / 8,
+                              args.discriminator_filters / 4, args.discriminator_filters / 4,
+                              args.discriminator_filters / 2, args.discriminator_filters / 2,
+                              args.discriminator_filters]
+        params.resamples = ('SAME', "DOWN", "SAME", "DOWN", "SAME", "DOWN", "SAME")
+    params.number_of_classes = 10 if args.dataset != 'cifar100' else 100
 
-    params.norm = args.discriminator_bn
+    params.norm = args.discriminator_norm
     params.after_norm = args.discriminator_after_norm
 
     params.spectral = args.spectral
     params.fully_diff_spectral = args.fully_diff_spectral
     params.spectral_iterations = args.spectral_iterations
     params.conv_singular = args.conv_singular
-    params.renorm_for_cond_singular = args.renorm_for_cond_singular
 
     params.type = args.gan_type
-    params.conditional_bottleneck = 'c' in args.discriminator_bottleneck
-    params.unconditional_bottleneck = 'u' in args.discriminator_bottleneck
-    params.conditional_shortcut = 'c' in args.discriminator_shortcut
-    params.unconditional_shortcut = 'u' in args.discriminator_shortcut
-
-    params.cls_branch = args.discriminator_cls_branch
 
     params.sum_pool = args.sum_pool
-    params.class_agnostic_blocks = args.discriminator_agnostic_blocks
-    params.agnostic_stream = args.discriminator_agnostic_stream
     params.dropout = args.discriminator_dropout
+
+    params.triangular_conv = args.triangular_conv
 
     return params
 
@@ -198,7 +202,9 @@ def main():
     parser.add_argument("--lr", default=5e-4, type=float, help="Learning rate")
     parser.add_argument("--beta1", default=0, type=float, help='Adam parameter')
     parser.add_argument("--beta2", default=0.9, type=float, help='Adam parameter')
-    parser.add_argument("--dataset", default='cifar10', choices=['mnist', 'cifar10'], help='Dataset to train on')
+    parser.add_argument("--dataset", default='cifar10', choices=['mnist', 'cifar10', 'cifar100', 'fashion-mnist'],
+                        help='Dataset to train on')
+    parser.add_argument("--arch", default='res', choices=['res', 'dcgan'], help="Gan architecture resnet or dcgan.")
 
     parser.add_argument("--spectral", default=0, type=int, help='Use spectral norm in discriminator')
     parser.add_argument("--fully_diff_spectral", default=0, type=int, help='Fully difirentiable spectral normalization')
@@ -206,9 +212,7 @@ def main():
     parser.add_argument("--conv_singular", default=0, type=int, help='Singular convolution layer')
 
     parser.add_argument("--generator_block_norm", default='u', choices=['n', 'b', 'd'],
-                        help='Batch normalization in generator resblock. cb - conditional batch,'
-                             ' ub - unconditional batch, n - none.'
-                             'conv - conv11 after uncoditional, d - decorelation.')
+                        help='Normalization in generator resblock. b - batch, d - decorelation, n - none.')
     parser.add_argument("--generator_block_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv','n'],
                         help="Layer after normalization")
 
@@ -219,69 +223,37 @@ def main():
     parser.add_argument("--generator_last_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv','n'],
                         help="Layer after normalization")
 
-    parser.add_argument("-generator_renorm_for_decor", default=0, type=int, help='Renorm for decorelation normalization')
-
+    parser.add_argument("--generator_renorm_for_decor", default=0, type=int, help='Renorm for decorelation normalization')
     parser.add_argument("--generator_concat_cls", default=0, type=int, help='Concat labels to noise in genrator')
-    parser.add_argument("--generator_bottleneck", default='no', choices=['c', 'u', 'uc', 'cu', 'no'],
-                        help='Bottleneck to use in generator u - unconditional.'
-                             'c - conditional, uc - conditional and unconitional'
-                             'no - not use bottlenecks')
-    parser.add_argument("--generator_shortcut", default='u', choices=['c', 'u', 'uc', 'cu'],
-                        help='Shortcut to use in generator u - unconditional. '
-                             'c - conditional, uc - conditional and unconitional')
-    parser.add_argument("--generator_filters", default=256, type=int,help='Number of filters in generator_block')
-    parser.add_argument("--generator_first_filters", default=256,
-                        type=int, help='Number of filters in first generator_block')
-    parser.add_argument("--generator_cls_branch", default=0, type=int, help="Use classifier branch in generator")
-    parser.add_argument("--generator_triangular_cond_conv", default=0,
-                        type=int, help="Use triangular conditional conv11")
 
-    parser.add_argument("--gan_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE', 'CLS'],
+    parser.add_argument("--generator_filters", default=128, type=int, help='Number of filters in generator block')
+    parser.add_argument("--generator_first_filters", default=128, type=int, help='Number of filters in first generator feature map')
+
+
+    parser.add_argument("--triangular_conv", default=0, type=int, help="Use triangular conv after decorelation")
+
+    parser.add_argument("--gan_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE'],
                         help='Type of gan to use. None for unsuperwised.')
 
-    parser.add_argument("--discriminator_bottleneck", default='no', choices=['c', 'u', 'uc', 'cu', 'no'],
-                        help='Bottleneck to use in discriminator u - unconditional.'
-                             'c - conditional, uc - conditional and unconitional'
-                             'no - not use bottlenecks')
-    parser.add_argument("--discriminator_shortcut", default='u', choices=['c', 'u', 'uc', 'cu'],
-                        help='Shortcut to use in discriminator u - unconditional. '
-                             'c - conditional, uc - conditional and unconitional')
+    parser.add_argument("--discriminator_norm", default='n', choices=['n', 'b', 'd'],
+                        help='Normalization in generator resblock. b - batch, d - decorelation, n - none.')
 
-    parser.add_argument("--discriminator_bn", default='n', choices=['n', 'cb', 'd', 'ub'],
-                        help='Batch normalization in discriminator. cb - conditional batch,'
-                             ' ub - unconditional batch, n - none.'
-                             'conv - conv11 after uncoditional, d - decorelation.')
-    parser.add_argument("--discriminator_after_norm", default='n', choices=['cs', 'conv', 'n'],
-                        help="Cond layer after normalization. cs - center scale, conv - conditional conv11."
-                             " n - None")
+    parser.add_argument("--discriminator_after_norm", default='n',
+                        choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv','n'],
+                        help="Layer after normalization")
 
     parser.add_argument("--discriminator_filters", default=128, type=int, help='Number of filters in discriminator_block')
-    parser.add_argument("--discriminator_agnostic_blocks", default=4, type=int,
-                        help="Number of blocks that is share in discriminator.")
-    parser.add_argument("--discriminator_cls_branch", default=0, type=int, help="Use classifier branch in generator")
-    parser.add_argument("--discriminator_agnostic_stream", type=int, default=1,
-                        help='Use cls agnostic stream in discriminator of CLS type')
+    parser.add_argument("--discriminator_dropout", type=float, default=0, help="Use dropout in discriminator")
 
-    parser.add_argument("--compute_inception", default=1, type=int, help='Compute inception score')
-    parser.add_argument("--compute_fid", default=1, type=int, help="Compute fid score")
+    parser.add_argument("--samples_inception", default=50000, type=int, help='Samples for inception, 0 - no compute inception')
+    parser.add_argument("--samples_fid", default=10000, type=int, help="Samples for FID, 0 - no compute FID")
 
-    parser.add_argument("--print_summary", default=1, type=int, help="Print summary of models")
     parser.add_argument("--lr_decay_schedule", default=None, choices=[None, 'linear', 'half-linear', 'linear-end'],
                         help='Learnign rate decay schedule. None - no decay. '
                              'linear - linear decay to zero. half-linear - linear decay to 0.5'
                              'linear-end constant until 0.9, then linear decay to 0')
 
-    parser.add_argument("--sum_pool", default=1, type=int,
-                        help='Use sum or average pooling')
-    parser.add_argument("--conditional_optimizer", type=int, default=0,
-                        help="Increase lerning rate for conditional layers")
-    parser.add_argument("--renorm_for_cond_singular", type=int, default=0,
-                        help='If compute one sigma per conditional filter. Otherwise compute number_of_classes sigma.')
-    parser.add_argument("--samples_for_evaluation", type=int, default=50000, help='Number of samples for evaluation')
-
-    parser.add_argument("--concatenate_generator_batches", type=int, default=True,
-                        help='Concatenate batches in generator or use multiple batches')
-    parser.add_argument("--discriminator_dropout", type=float, default=0, help="Use dropout in discriminator")
+    parser.add_argument("--sum_pool", default=1, type=int, help='Use sum or average pooling')
 
     args = parser.parse_args()
 
@@ -296,8 +268,7 @@ def main():
     with open(os.path.join(args.output_dir, 'config.json'), 'w') as outfile:
         json.dump(vars(args), outfile, indent=4)
 
-    args.number_of_stages = 5 if args.dataset == 'mnist' else 7
-    args.image_shape = (28, 28, 1) if args.dataset == 'mnist' else (32, 32, 3)
+    args.image_shape = (28, 28, 1) if args.dataset.endswith('mnist') else (32, 32, 3)
     args.fid_cache_file = "output/%s_fid.npz" % args.dataset
 
     discriminator_params = get_discriminator_params(args)
