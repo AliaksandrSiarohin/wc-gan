@@ -213,14 +213,14 @@ def main():
 
     parser.add_argument("--generator_block_norm", default='u', choices=['n', 'b', 'd'],
                         help='Normalization in generator resblock. b - batch, d - decorelation, n - none.')
-    parser.add_argument("--generator_block_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv','n'],
+    parser.add_argument("--generator_block_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv','ccsuconv', 'n'],
                         help="Layer after normalization")
 
     parser.add_argument("--generator_last_norm", default='b', choices=['n', 'b', 'd'],
                         help='Batch normalization in generator last. cb - conditional batch,'
                              ' ub - unconditional batch, n - none.'
                              'conv - conv11 after uncoditional, d - decorelation.')
-    parser.add_argument("--generator_last_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv','n'],
+    parser.add_argument("--generator_last_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv', 'ccsuconv', 'n'],
                         help="Layer after normalization")
 
     parser.add_argument("--generator_renorm_for_decor", default=0, type=int, help='Renorm for decorelation normalization')
@@ -239,7 +239,7 @@ def main():
                         help='Normalization in generator resblock. b - batch, d - decorelation, n - none.')
 
     parser.add_argument("--discriminator_after_norm", default='n',
-                        choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv','n'],
+                        choices=['ccs', 'ucs', 'uccs', 'cconv', 'uconv', 'ucconv', 'ccsuconv', 'n'],
                         help="Layer after normalization")
 
     parser.add_argument("--discriminator_filters", default=128, type=int, help='Number of filters in discriminator_block')

@@ -15,7 +15,7 @@ from functools import partial
 def create_norm(norm, after_norm, cls=None, number_of_classes=None,
                 triangular_conv=False, uncoditional_conv_layer=Conv2D, conditional_conv_layer=ConditionalConv11):
     assert norm in ['n', 'b', 'd']
-    assert after_norm in ['ucs', 'ccs', 'uccs', 'uconv', 'cconv', 'ucconv', 'n']
+    assert after_norm in ['ucs', 'ccs', 'uccs', 'uconv', 'cconv', 'ucconv', 'ccsuconv', 'n']
 
     if norm == 'n':
         norm_layer = lambda axis, name: (lambda inp: inp)
@@ -49,6 +49,14 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None,
             def f(x):
                 c = conditional_conv_layer(number_of_classes=number_of_classes, name=name + '_c',
                                       filters=K.int_shape(x)[axis], triangular=triangular_conv)([x, cls])
+                u = uncoditional_conv_layer(kernel_size=(1, 1), filters=K.int_shape(x)[axis], name=name + '_u')(x)
+                out = Add(name=name + '_a')([c, u])
+                return out
+            return f
+    elif after_norm == 'ccsuconv':
+        def after_norm_layer(axis, name):
+            def f(x):
+                c = ConditionalCenterScale(number_of_classes=number_of_classes, axis=axis, name=name + '_c')([x, cls])
                 u = uncoditional_conv_layer(kernel_size=(1, 1), filters=K.int_shape(x)[axis], name=name + '_u')(x)
                 out = Add(name=name + '_a')([c, u])
                 return out
