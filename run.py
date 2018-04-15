@@ -158,6 +158,8 @@ def get_generator_params(args):
     params.last_after_norm = args.generator_last_after_norm
 
     params.gan_type = args.gan_type
+    
+    params.arch = args.arch
     return params
 
 
@@ -190,6 +192,8 @@ def get_discriminator_params(args):
     params.dropout = args.discriminator_dropout
 
     params.triangular_conv = args.triangular_conv
+
+    params.arch = args.arch
 
     return params
 
