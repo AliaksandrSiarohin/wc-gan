@@ -147,8 +147,6 @@ def get_generator_params(args):
 
     params.concat_cls = args.generator_concat_cls
 
-    params.triangular_conv = args.triangular_conv
-
     params.renorm_for_decor = args.generator_renorm_for_decor
 
     params.block_norm = args.generator_block_norm
@@ -191,8 +189,6 @@ def get_discriminator_params(args):
     params.sum_pool = args.sum_pool
     params.dropout = args.discriminator_dropout
 
-    params.triangular_conv = args.triangular_conv
-
     params.arch = args.arch
 
     return params
@@ -203,7 +199,7 @@ def main():
     parser.add_argument("--phase", choices=['train', 'test'], default='train')
     parser.add_argument("--generator_batch_multiple", default=2, type=int,
                         help="Size of the generator batch, multiple of batch_size.")
-    parser.add_argument("--lr", default=5e-4, type=float, help="Learning rate")
+    parser.add_argument("--lr", default=2e-4, type=float, help="Learning rate")
     parser.add_argument("--beta1", default=0, type=float, help='Adam parameter')
     parser.add_argument("--beta2", default=0.9, type=float, help='Adam parameter')
     parser.add_argument("--dataset", default='cifar10', choices=['mnist', 'cifar10', 'cifar100', 'fashion-mnist'],
@@ -231,10 +227,6 @@ def main():
     parser.add_argument("--generator_concat_cls", default=0, type=int, help='Concat labels to noise in genrator')
 
     parser.add_argument("--generator_filters", default=128, type=int, help='Number of filters in generator block')
-    parser.add_argument("--generator_first_filters", default=128, type=int, help='Number of filters in first generator feature map')
-
-
-    parser.add_argument("--triangular_conv", default=0, type=int, help="Use triangular conv after decorelation")
 
     parser.add_argument("--gan_type", default=None, choices=[None, 'AC_GAN', 'PROJECTIVE'],
                         help='Type of gan to use. None for unsuperwised.')

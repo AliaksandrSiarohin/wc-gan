@@ -15,7 +15,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
                        resamples=('DOWN', "DOWN", "SAME", "SAME"),
                        number_of_classes=10, type='AC_GAN', norm='n', after_norm='n', spectral=False,
                        fully_diff_spectral=False, spectral_iterations=1, conv_singular=True,
-                       sum_pool=False, dropout=False, triangular_conv=False, arch='res'):
+                       sum_pool=False, dropout=False, arch='res'):
 
     assert arch in ['res', 'dcgan']
     assert len(block_sizes) == len(resamples)
@@ -38,8 +38,7 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
 
 
     norm_layer = create_norm(norm=norm, after_norm=after_norm, cls=cls, number_of_classes=number_of_classes,
-                             triangular_conv=triangular_conv, conditional_conv_layer=cond_conv_layer,
-                             uncoditional_conv_layer=conv_layer)
+                             conditional_conv_layer=cond_conv_layer, uncoditional_conv_layer=conv_layer)
 
     y = x
     i = 0

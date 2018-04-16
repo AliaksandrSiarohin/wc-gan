@@ -6,14 +6,14 @@ import numpy as np
 from gan.layer_utils import glorot_init
 
 from gan.conditional_layers import ConditinalBatchNormalization, cond_resblock, ConditionalConv11, ConditionalDepthwiseConv2D, get_separable_conv,\
-                                   DecorelationNormalization, ConditionalCenterScale, CenterScale, cond_dcblock
+                                   DecorelationNormalization, ConditionalCenterScale, CenterScale, cond_dcblock, FactorizedConditionalConv11
 
 import keras.backend as K
 from functools import partial
 
 
 def create_norm(norm, after_norm, cls=None, number_of_classes=None,
-                triangular_conv=False, uncoditional_conv_layer=Conv2D, conditional_conv_layer=ConditionalConv11):
+                uncoditional_conv_layer=Conv2D, conditional_conv_layer=ConditionalConv11):
     assert norm in ['n', 'b', 'd']
     assert after_norm in ['ucs', 'ccs', 'uccs', 'uconv', 'cconv', 'ucconv', 'ccsuconv', 'n']
 
@@ -40,7 +40,7 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None,
     elif after_norm == 'cconv':
         after_norm_layer = lambda axis, name: lambda x: conditional_conv_layer(filters=K.int_shape(x)[axis],
                                                                           number_of_classes=number_of_classes,
-                                                                          name=name, triangular=triangular_conv)([x, cls])
+                                                                          name=name)([x, cls])
     elif after_norm == 'uconv':
         after_norm_layer = lambda axis, name: lambda x: uncoditional_conv_layer(kernel_size=(1, 1),
                                                                filters=K.int_shape(x)[axis], name=name)(x)
@@ -48,7 +48,7 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None,
         def after_norm_layer(axis, name):
             def f(x):
                 c = conditional_conv_layer(number_of_classes=number_of_classes, name=name + '_c',
-                                      filters=K.int_shape(x)[axis], triangular=triangular_conv)([x, cls])
+                                      filters=K.int_shape(x)[axis])([x, cls])
                 u = uncoditional_conv_layer(kernel_size=(1, 1), filters=K.int_shape(x)[axis], name=name + '_u')(x)
                 out = Add(name=name + '_a')([c, u])
                 return out
@@ -57,6 +57,16 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None,
         def after_norm_layer(axis, name):
             def f(x):
                 c = ConditionalCenterScale(number_of_classes=number_of_classes, axis=axis, name=name + '_c')([x, cls])
+                u = uncoditional_conv_layer(kernel_size=(1, 1), filters=K.int_shape(x)[axis], name=name + '_u')(x)
+                out = Add(name=name + '_a')([c, u])
+                return out
+            return f
+    elif after_norm == 'ufconv':
+        def after_norm_layer(axis, name):
+            def f(x):
+                c = FactorizedConditionalConv11(number_of_classes=number_of_classes, name=name + '_c',
+                                                filters=K.int_shape(x)[axis], filters_emb=max(10, number_of_classes / 10),
+                                                use_bias=False)([x, cls])
                 u = uncoditional_conv_layer(kernel_size=(1, 1), filters=K.int_shape(x)[axis], name=name + '_u')(x)
                 out = Add(name=name + '_a')([c, u])
                 return out
@@ -80,8 +90,7 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
                    first_block_shape=(4, 4, 128), number_of_classes=10, concat_cls=False,
                    block_norm='u', block_after_norm='cs',
                    last_norm='u', last_after_norm='cs',
-                   renorm_for_decor=False, triangular_conv=False, gan_type=None,
-                   arch='res'):
+                   renorm_for_decor=False, gan_type=None, arch='res'):
 
     assert arch in ['res', 'dcgan']
     inp = Input(input_noise_shape)
@@ -98,10 +107,10 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
     y = Reshape(first_block_shape)(y)
 
     block_norm_layer = create_norm(block_norm, block_after_norm, cls=cls,
-                             number_of_classes=number_of_classes, triangular_conv=triangular_conv)
+                             number_of_classes=number_of_classes)
 
     last_norm_layer = create_norm(last_norm, last_after_norm, cls=cls,
-                             number_of_classes=number_of_classes, triangular_conv=triangular_conv)
+                             number_of_classes=number_of_classes)
 
 
     i = 0
