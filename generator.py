@@ -15,7 +15,7 @@ from functools import partial
 def create_norm(norm, after_norm, cls=None, number_of_classes=None, filters_emb = 10,
                 uncoditional_conv_layer=Conv2D, conditional_conv_layer=ConditionalConv11):
     assert norm in ['n', 'b', 'd']
-    assert after_norm in ['ucs', 'ccs', 'uccs', 'uconv', 'cconv', 'ucconv', 'ccsuconv', 'n']
+    assert after_norm in ['ucs', 'ccs', 'uccs', 'uconv', 'ufconv', 'cconv', 'ucconv', 'ccsuconv', 'n']
 
     if norm == 'n':
         norm_layer = lambda axis, name: (lambda inp: inp)
