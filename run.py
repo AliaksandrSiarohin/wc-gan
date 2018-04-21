@@ -23,8 +23,8 @@ from keras import backend as K
 from keras.backend import tf as ktf
 
 
-def get_dataset(dataset, batch_size, supervised = False, noise_size = (128, )):
-    assert dataset in ['mnist', 'cifar10', 'cifar100', 'fashion-mnist']
+def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
+    assert dataset in ['mnist', 'cifar10', 'cifar100', 'fashion-mnist', 'stl10']
 
     if dataset == 'mnist':
         from keras.datasets import mnist
@@ -42,6 +42,10 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size = (128, )):
         (X, y), (X_test, y_test) = load_data()
         X = X.reshape((X.shape[0], X.shape[1], X.shape[2], 1))
         X_test = X_test.reshape((X_test.shape[0], X_test.shape[1], X_test.shape[2], 1))
+    elif dataset == 'stl10':
+        from stl10 import load_data
+        (X, y), (X_test, y_test) = load_data()
+        assert not supervised
 
     return LabeledArrayDataset(X=X, y=y if supervised else None, X_test=X_test, y_test=y_test,
                                batch_size=batch_size, noise_size=noise_size)
@@ -72,7 +76,7 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
     discriminator.summary()
 
     if generator_checkpoint is not None:
-        generator.load_weights(generator_checkpoint, by_name=True)
+        generator.load_weights(generator_checkpoint)#, by_name=True)
 
     if discriminator_checkpoint is not None:
         discriminator.load_weights(discriminator_checkpoint, by_name=True)
@@ -134,14 +138,15 @@ def get_generator_params(args):
     params = Namespace()
     params.output_channels = 1 if args.dataset.endswith('mnist') else 3
     params.input_cls_shape = (1, )
+
+    first_block_w = (7 if args.dataset.endswith('mnist') else (6 if args.dataset == 'stl10' else 4))
+    params.first_block_shape = (first_block_w, first_block_w, args.generator_filters)
     if args.arch == 'res':
         params.block_sizes = tuple([args.generator_filters] * 2) if args.dataset.endswith('mnist') else tuple([args.generator_filters] * 3)
-        params.first_block_shape = (7, 7, args.generator_filters) if args.dataset.endswith('mnist') else (4, 4, args.generator_filters)
         params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
     else:
         params.block_sizes = ([args.generator_filters, args.generator_filters / 2] if args.dataset.endswith('mnist')
                               else [args.generator_filters, args.generator_filters / 2, args.generator_filters / 4])
-        params.first_block_shape = (7, 7, args.generator_filters) if args.dataset.endswith('mnist') else (4, 4, args.generator_filters)
         params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
     params.number_of_classes = 10 if args.dataset != 'cifar100' else 100
 
@@ -202,7 +207,7 @@ def main():
     parser.add_argument("--lr", default=2e-4, type=float, help="Learning rate")
     parser.add_argument("--beta1", default=0, type=float, help='Adam parameter')
     parser.add_argument("--beta2", default=0.9, type=float, help='Adam parameter')
-    parser.add_argument("--dataset", default='cifar10', choices=['mnist', 'cifar10', 'cifar100', 'fashion-mnist'],
+    parser.add_argument("--dataset", default='cifar10', choices=['mnist', 'cifar10', 'cifar100', 'fashion-mnist', 'stl10'],
                         help='Dataset to train on')
     parser.add_argument("--arch", default='res', choices=['res', 'dcgan'], help="Gan architecture resnet or dcgan.")
 
