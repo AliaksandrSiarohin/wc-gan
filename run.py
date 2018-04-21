@@ -145,8 +145,8 @@ def get_generator_params(args):
         params.block_sizes = tuple([args.generator_filters] * 2) if args.dataset.endswith('mnist') else tuple([args.generator_filters] * 3)
         params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
     else:
-        params.block_sizes = ([args.generator_filters, args.generator_filters / 2] if args.dataset.endswith('mnist')
-                              else [args.generator_filters, args.generator_filters / 2, args.generator_filters / 4])
+        params.block_sizes = ([args.generator_filters / 2, args.generator_filters / 4] if args.dataset.endswith('mnist')
+                              else [args.generator_filters / 2, args.generator_filters / 4, args.generator_filters / 8])
         params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
     params.number_of_classes = 10 if args.dataset != 'cifar100' else 100
 
@@ -174,9 +174,9 @@ def get_discriminator_params(args):
         params.block_sizes = tuple([args.discriminator_filters] * 4)
         params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
     else:
-        params.block_sizes = [args.discriminator_filters / 8, args.discriminator_filters / 8,
-                              args.discriminator_filters / 4, args.discriminator_filters / 4,
-                              args.discriminator_filters / 2, args.discriminator_filters / 2,
+        params.block_sizes = [args.discriminator_filters / 8, args.discriminator_filters / 4,
+                              args.discriminator_filters / 4, args.discriminator_filters / 2,
+                              args.discriminator_filters / 2, args.discriminator_filters,
                               args.discriminator_filters]
         params.resamples = ('SAME', "DOWN", "SAME", "DOWN", "SAME", "DOWN", "SAME")
     params.number_of_classes = 10 if args.dataset != 'cifar100' else 100
