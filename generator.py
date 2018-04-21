@@ -12,7 +12,7 @@ import keras.backend as K
 from functools import partial
 
 
-def create_norm(norm, after_norm, cls=None, number_of_classes=None,
+def create_norm(norm, after_norm, cls=None, number_of_classes=None, filters_emb = 10,
                 uncoditional_conv_layer=Conv2D, conditional_conv_layer=ConditionalConv11):
     assert norm in ['n', 'b', 'd']
     assert after_norm in ['ucs', 'ccs', 'uccs', 'uconv', 'cconv', 'ucconv', 'ccsuconv', 'n']
@@ -65,7 +65,7 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None,
         def after_norm_layer(axis, name):
             def f(x):
                 c = FactorizedConditionalConv11(number_of_classes=number_of_classes, name=name + '_c',
-                                                filters=K.int_shape(x)[axis], filters_emb=max(10, number_of_classes / 10),
+                                                filters=K.int_shape(x)[axis], filters_emb=filters_emb,
                                                 use_bias=False)([x, cls])
                 u = uncoditional_conv_layer(kernel_size=(1, 1), filters=K.int_shape(x)[axis], name=name + '_u')(x)
                 out = Add(name=name + '_a')([c, u])
@@ -88,7 +88,7 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None,
 def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=(1, ),
                    block_sizes=(128, 128, 128), resamples=("UP", "UP", "UP"),
                    first_block_shape=(4, 4, 128), number_of_classes=10, concat_cls=False,
-                   block_norm='u', block_after_norm='cs',
+                   block_norm='u', block_after_norm='cs', filters_emb = 10,
                    last_norm='u', last_after_norm='cs',
                    renorm_for_decor=False, gan_type=None, arch='res'):
 
@@ -107,10 +107,10 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
     y = Reshape(first_block_shape)(y)
 
     block_norm_layer = create_norm(block_norm, block_after_norm, cls=cls,
-                             number_of_classes=number_of_classes)
+                             number_of_classes=number_of_classes, filters_emb=filters_emb)
 
     last_norm_layer = create_norm(last_norm, last_after_norm, cls=cls,
-                             number_of_classes=number_of_classes)
+                             number_of_classes=number_of_classes, filters_emb=filters_emb)
 
 
     i = 0

@@ -163,6 +163,8 @@ def get_generator_params(args):
     params.gan_type = args.gan_type
     
     params.arch = args.arch
+    params.filters_emb = args.filters_emb
+
     return params
 
 
@@ -195,6 +197,7 @@ def get_discriminator_params(args):
     params.dropout = args.discriminator_dropout
 
     params.arch = args.arch
+    params.filters_emb = args.filters_emb
 
     return params
 
@@ -215,6 +218,7 @@ def main():
     parser.add_argument("--fully_diff_spectral", default=0, type=int, help='Fully difirentiable spectral normalization')
     parser.add_argument("--spectral_iterations", default=1, type=int, help='Number of iteration per spectral update')
     parser.add_argument("--conv_singular", default=0, type=int, help='Singular convolution layer')
+    parser.add_argument("--filters_emb", default=10, type=int, help='Number of inner filters in factorized conv.')
 
     parser.add_argument("--generator_block_norm", default='u', choices=['n', 'b', 'd'],
                         help='Normalization in generator resblock. b - batch, d - decorelation, n - none.')
@@ -269,7 +273,7 @@ def main():
     with open(os.path.join(args.output_dir, 'config.json'), 'w') as outfile:
         json.dump(vars(args), outfile, indent=4)
 
-    args.image_shape = (28, 28, 1) if args.dataset.endswith('mnist') else (32, 32, 3)
+    args.image_shape = (28, 28, 1) if args.dataset.endswith('mnist') else ((48, 48, 3) if args.dataset == 'stl10' else (32, 32, 3))
     args.fid_cache_file = "output/%s_fid.npz" % args.dataset
 
     discriminator_params = get_discriminator_params(args)
