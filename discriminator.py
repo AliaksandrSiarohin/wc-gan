@@ -1,6 +1,6 @@
 from keras.models import Input, Model
 from keras.layers import Dense, Activation, Conv2D, GlobalAveragePooling2D, Lambda, Dropout, Flatten
-from keras.layers import Add, Embedding
+from keras.layers import Add, Embedding, LeakyReLU
 
 from gan.conditional_layers import cond_resblock, ConditionalConv11, cond_dcblock
 from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNEmbeding
@@ -52,7 +52,10 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
                               name='Discriminator.' + str(i), norm=norm_layer, is_first=(i == 0), conv_layer=conv_layer)
             i += 1
 
-    y = Activation('relu')(y)
+    if arch == 'res':
+        y = Activation('relu')(y)
+    else:
+        y = LeakyReLU()(y)
 
     if arch == 'res':
         if sum_pool:
