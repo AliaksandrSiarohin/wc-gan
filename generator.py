@@ -41,6 +41,10 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None, filters_emb 
         after_norm_layer = lambda axis, name: lambda x: conditional_conv_layer(filters=K.int_shape(x)[axis],
                                                                           number_of_classes=number_of_classes,
                                                                           name=name)([x, cls])
+    elif after_norm == 'fconv':
+        after_norm_layer = lambda axis, name: lambda x: FactorizedConditionalConv11(number_of_classes=number_of_classes,
+                                                        name=name + '_c', filters=K.int_shape(x)[axis],
+                                                        filters_emb=filters_emb, use_bias=False)([x, cls])
     elif after_norm == 'uconv':
         after_norm_layer = lambda axis, name: lambda x: uncoditional_conv_layer(kernel_size=(1, 1),
                                                                filters=K.int_shape(x)[axis], name=name)(x)
