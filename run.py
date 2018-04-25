@@ -139,10 +139,11 @@ def get_lr_decay_schedule(args):
                                 ktf.maximum(0., 1. - (K.cast(iter, 'float32') - number_of_iters_until_decay_discriminator) / number_of_iters_after_decay_discriminator), 1)
     elif args.lr_decay_schedule.startswith("dropat"):
         drop_at = int(args.lr_decay_schedule.replace('dropat', ''))
-        drop_at_generator = drop_at * 1000.
+        drop_at_generator = drop_at * 1000
         drop_at_discriminator = drop_at * 1000 * args.training_ratio
-        lr_decay_schedule_generator = lambda iter: 1. if iter < drop_at_generator else 0.1
-        lr_decay_schedule_discriminator = lambda iter: 1. if iter < drop_at_discriminator else 0.1
+        print ("Drop at generator %s" % drop_at_generator)
+        lr_decay_schedule_generator = lambda iter: ktf.where(K.less(iter, drop_at_generator), 1.,  0.1)
+        lr_decay_schedule_discriminator = lambda iter: ktf.where(K.less(iter, drop_at_discriminator), 1.,  0.1)
     else:
         assert False
 
@@ -281,7 +282,7 @@ def main():
     parser.add_argument("--samples_inception", default=50000, type=int, help='Samples for inception, 0 - no compute inception')
     parser.add_argument("--samples_fid", default=10000, type=int, help="Samples for FID, 0 - no compute FID")
 
-    parser.add_argument("--lr_decay_schedule", default=None, choices=[None, 'linear', 'half-linear', 'linear-end'],
+    parser.add_argument("--lr_decay_schedule", default=None,
                         help='Learnign rate decay schedule. None - no decay. '
                              'linear - linear decay to zero. half-linear - linear decay to 0.5'
                              'linear-end constant until 0.9, then linear decay to 0')
