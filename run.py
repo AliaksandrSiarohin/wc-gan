@@ -134,8 +134,10 @@ def get_lr_decay_schedule(args):
         drop_at_generator = drop_at * 1000
         drop_at_discriminator = drop_at * 1000 * args.training_ratio
         print ("Drop at generator %s" % drop_at_generator)
-        lr_decay_schedule_generator = lambda iter: ktf.where(K.less(iter, drop_at_generator), 1.,  0.1)
-        lr_decay_schedule_discriminator = lambda iter: ktf.where(K.less(iter, drop_at_discriminator), 1.,  0.1)
+        lr_decay_schedule_generator = lambda iter: (ktf.where(K.less(iter, drop_at_generator), 1.,  0.1) *
+                                                     K.maximum(0., 1. - K.cast(iter, 'float32') / number_of_iters_generator))
+        lr_decay_schedule_discriminator = lambda iter: (ktf.where(K.less(iter, drop_at_discriminator), 1.,  0.1) *
+                                                        K.maximum(0., 1. - K.cast(iter, 'float32') / number_of_iters_discriminator))
     else:
         assert False
 
