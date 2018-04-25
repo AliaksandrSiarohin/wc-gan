@@ -6,6 +6,7 @@ from gan.train import Trainer
 from gan.ac_gan import AC_GAN
 from gan.projective_gan import ProjectiveGAN
 from gan.gan import GAN
+from gan.conditional_layers import ConditionalAdamOptimizer
 
 import os
 import json
@@ -55,8 +56,15 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
 def compile_and_run(dataset, args, generator_params, discriminator_params):
     additional_info = json.dumps(vars(args))
 
-    args.generator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
-    args.discriminator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
+    if args.cond_optim:
+        args.generator_optimizer = ConditionalAdamOptimizer(number_of_classes=generator_params.number_of_classes,
+                                                            lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
+        args.discriminator_optimizer = ConditionalAdamOptimizer(number_of_classes = generator_params.number_of_classes,
+                                                                lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
+
+    else:
+        args.generator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
+        args.discriminator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
 
     log_file = os.path.join(args.output_dir, 'log.txt')
 
@@ -228,6 +236,8 @@ def main():
     parser.add_argument("--phase", choices=['train', 'test'], default='train')
     parser.add_argument("--generator_batch_multiple", default=2, type=int,
                         help="Size of the generator batch, multiple of batch_size.")
+
+    parser.add_argument("--cond_optim", default=0, type=int, help="If true, decrease lr for cond layers.")
     parser.add_argument("--lr", default=2e-4, type=float, help="Learning rate")
     parser.add_argument("--beta1", default=0, type=float, help='Adam parameter')
     parser.add_argument("--beta2", default=0.9, type=float, help='Adam parameter')
