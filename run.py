@@ -57,10 +57,8 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
     additional_info = json.dumps(vars(args))
 
     if args.cond_optim:
-        args.generator_optimizer = ConditionalAdamOptimizer(number_of_classes=generator_params.number_of_classes,
-                                                            lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
-        args.discriminator_optimizer = ConditionalAdamOptimizer(number_of_classes = generator_params.number_of_classes,
-                                                                lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
+        args.generator_optimizer = ConditionalAdamOptimizer(lr_decay_schedule=args.lr_decay_schedule, lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
+        args.discriminator_optimizer = Adam(lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
 
     else:
         args.generator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
@@ -111,7 +109,7 @@ def get_lr_decay_schedule(args):
     if args.lr_decay_schedule is None:
         lr_decay_schedule_generator = lambda iter: 1.
         lr_decay_schedule_discriminator = lambda iter: 1.
-    elif args.lr_decay_schedule == 'linear':
+    elif args.lr_decay_schedule == 'linear' or args.lr_decay_schedule.startswith("dropatc"):
         lr_decay_schedule_generator = lambda iter: K.maximum(0., 1. - K.cast(iter, 'float32') / number_of_iters_generator)
         lr_decay_schedule_discriminator = lambda iter: K.maximum(0., 1. - K.cast(iter, 'float32') / number_of_iters_discriminator)
     elif args.lr_decay_schedule == 'half-linear':
@@ -142,8 +140,10 @@ def get_lr_decay_schedule(args):
         drop_at_generator = drop_at * 1000
         drop_at_discriminator = drop_at * 1000 * args.training_ratio
         print ("Drop at generator %s" % drop_at_generator)
-        lr_decay_schedule_generator = lambda iter: ktf.where(K.less(iter, drop_at_generator), 1.,  0.1)
-        lr_decay_schedule_discriminator = lambda iter: ktf.where(K.less(iter, drop_at_discriminator), 1.,  0.1)
+        lr_decay_schedule_generator = lambda iter: (ktf.where(K.less(iter, drop_at_generator), 1.,  0.1) *
+                                                     K.maximum(0., 1. - K.cast(iter, 'float32') / number_of_iters_generator))
+        lr_decay_schedule_discriminator = lambda iter: (ktf.where(K.less(iter, drop_at_discriminator), 1.,  0.1) *
+                                                        K.maximum(0., 1. - K.cast(iter, 'float32') / number_of_iters_discriminator))
     else:
         assert False
 
