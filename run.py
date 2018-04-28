@@ -251,7 +251,7 @@ def main():
 
     parser.add_argument("--generator_block_norm", default='u', choices=['n', 'b', 'd'],
                         help='Normalization in generator resblock. b - batch, d - decorelation, n - none.')
-    parser.add_argument("--generator_block_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'ufconv', 'cconv', 'uconv', 'ucconv','ccsuconv', 'n'],
+    parser.add_argument("--generator_block_after_norm", default='n', choices=['ccs', 'fconv', 'ucs', 'uccs', 'ufconv', 'cconv', 'uconv', 'ucconv','ccsuconv', 'n'],
                         help="Layer after normalization")
 
     parser.add_argument("--generator_last_norm", default='b', choices=['n', 'b', 'd'],
