@@ -47,7 +47,7 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
         assert not supervised
     elif dataset == 'imagenet':
         from imagenet import ImageNetdataset
-        return ImageNetdataset('ILSRVC2012/train', 'ILSRVC2012/val')
+        return ImageNetdataset('../ILSVRC2012/train64/lanczos/', batch_size=batch_size, noise_size=noise_size)
 
     return LabeledArrayDataset(X=X, y=y if supervised else None, X_test=X_test, y_test=y_test,
                                batch_size=batch_size, noise_size=noise_size)
