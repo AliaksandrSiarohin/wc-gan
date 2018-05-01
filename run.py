@@ -23,7 +23,7 @@ from keras.backend import tf as ktf
 
 
 def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
-    assert dataset in ['mnist', 'cifar10', 'cifar100', 'fashion-mnist', 'stl10']
+    assert dataset in ['imagenet', 'mnist', 'cifar10', 'cifar100', 'fashion-mnist', 'stl10']
 
     if dataset == 'mnist':
         from keras.datasets import mnist
@@ -159,8 +159,8 @@ def get_generator_params(args):
     params.first_block_shape = (first_block_w, first_block_w, args.generator_filters)
     if args.arch == 'res':
         if args.dataset == 'imagenet':
-            params.block_sizes = [args.generator_filters, args.generator_filters, args.generator_filters / 2,
-                                  args.generator_filters / 2]
+            params.block_sizes = [args.generator_filters, args.generator_filters / 2, args.generator_filters / 2,
+                                  args.generator_filters / 4]
             params.resamples = ("UP", "UP", "UP", "UP")
         else:
             params.block_sizes = tuple([args.generator_filters] * 2) if args.dataset.endswith('mnist') else tuple([args.generator_filters] * 3)
@@ -196,9 +196,9 @@ def get_discriminator_params(args):
     params.input_cls_shape = (1, )
     if args.arch == 'res':
         if args.dataset == 'imagenet':
-            params.block_sizes = [args.generator_filters / 4, args.generator_filters / 4, args.generator_filters / 2,
-                                  args.generator_filters / 2, args.generator_filters]
-            params.resamples = ("DOWN", "DOWN", "DOWN", "SAME", "SAME")
+            params.block_sizes = [args.discriminator_filters / 16, args.discriminator_filters / 8, args.discriminator_filters / 4,
+                                  args.discriminator_filters / 2, args.discriminator_filters]
+            params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "DOWN")
         else:
             params.block_sizes = tuple([args.discriminator_filters] * 4)
             params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
@@ -249,12 +249,12 @@ def main():
     parser.add_argument("--conv_singular", default=0, type=int, help='Singular convolution layer')
     parser.add_argument("--filters_emb", default=10, type=int, help='Number of inner filters in factorized conv.')
 
-    parser.add_argument("--generator_block_norm", default='u', choices=['n', 'b', 'd'],
+    parser.add_argument("--generator_block_norm", default='u', choices=['n', 'b', 'd', 'dr'],
                         help='Normalization in generator resblock. b - batch, d - decorelation, n - none.')
     parser.add_argument("--generator_block_after_norm", default='n', choices=['ccs', 'fconv', 'ucs', 'uccs', 'ufconv', 'cconv', 'uconv', 'ucconv','ccsuconv', 'n'],
                         help="Layer after normalization")
 
-    parser.add_argument("--generator_last_norm", default='b', choices=['n', 'b', 'd'],
+    parser.add_argument("--generator_last_norm", default='b', choices=['n', 'b', 'd', 'dr'],
                         help='Batch normalization in generator last. cb - conditional batch,'
                              ' ub - unconditional batch, n - none.'
                              'conv - conv11 after uncoditional, d - decorelation.')

@@ -14,7 +14,7 @@ from functools import partial
 
 def create_norm(norm, after_norm, cls=None, number_of_classes=None, filters_emb = 10,
                 uncoditional_conv_layer=Conv2D, conditional_conv_layer=ConditionalConv11):
-    assert norm in ['n', 'b', 'd']
+    assert norm in ['n', 'b', 'd', 'dr']
     assert after_norm in ['ucs', 'ccs', 'uccs', 'uconv', 'fconv', 'ufconv', 'cconv', 'ucconv', 'ccsuconv', 'n']
 
     if norm == 'n':
@@ -23,6 +23,10 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None, filters_emb 
         norm_layer = lambda axis, name: BatchNormalization(axis=axis, center=False, scale=False, name=name)
     elif norm == 'd':
         norm_layer = lambda axis, name: DecorelationNormalization(name=name)
+    elif norm == 'dr':
+        norm_layer = lambda axis, name: DecorelationNormalization(name=name, renorm=True)
+
+
 
     if after_norm == 'ccs':
         after_norm_layer = lambda axis, name: lambda x: ConditionalCenterScale(number_of_classes=number_of_classes,
