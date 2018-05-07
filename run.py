@@ -45,6 +45,9 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
         from stl10 import load_data
         (X, y), (X_test, y_test) = load_data()
         assert not supervised
+    elif dataset == 'tiny-imagenet':
+        from tiny_imagenet import load_data
+        (X, y), (X_test, y_test) = load_data()
     elif dataset == 'imagenet':
         from imagenet import ImageNetdataset
         return ImageNetdataset('../ILSVRC2012/train64/lanczos/', batch_size=batch_size, noise_size=noise_size)
@@ -158,7 +161,7 @@ def get_generator_params(args):
     first_block_w = (7 if args.dataset.endswith('mnist') else (6 if args.dataset == 'stl10' else 4))
     params.first_block_shape = (first_block_w, first_block_w, args.generator_filters)
     if args.arch == 'res':
-        if args.dataset == 'imagenet':
+        if args.dataset.endswith('imagenet'):
             params.block_sizes = [args.generator_filters, args.generator_filters / 2, args.generator_filters / 2,
                                   args.generator_filters / 4]
             params.resamples = ("UP", "UP", "UP", "UP")
@@ -170,7 +173,8 @@ def get_generator_params(args):
         params.block_sizes = ([args.generator_filters / 2, args.generator_filters / 4] if args.dataset.endswith('mnist')
                               else [args.generator_filters / 2, args.generator_filters / 4, args.generator_filters / 8])
         params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
-    params.number_of_classes = 100 if args.dataset == 'cifar100' else (1000 if args.dataset == 'imagenet' else 10)
+    params.number_of_classes = 100 if args.dataset == 'cifar100' else (1000 if args.dataset == 'imagenet'
+                                                                 else (200 if args.dataset == 'tiny-imagenet' else 10))
 
     params.concat_cls = args.generator_concat_cls
 
@@ -195,7 +199,7 @@ def get_discriminator_params(args):
     params.input_image_shape = args.image_shape
     params.input_cls_shape = (1, )
     if args.arch == 'res':
-        if args.dataset == 'imagenet':
+        if args.dataset.endswith('imagenet'):
             params.block_sizes = [args.discriminator_filters / 16, args.discriminator_filters / 8, args.discriminator_filters / 4,
                                   args.discriminator_filters / 2, args.discriminator_filters]
             params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "DOWN")
@@ -208,7 +212,8 @@ def get_discriminator_params(args):
                               args.discriminator_filters / 2, args.discriminator_filters,
                               args.discriminator_filters]
         params.resamples = ('SAME', "DOWN", "SAME", "DOWN", "SAME", "DOWN", "SAME")
-    params.number_of_classes = 100 if args.dataset == 'cifar100' else (1000 if args.dataset == 'imagenet' else 10)
+    params.number_of_classes = 100 if args.dataset == 'cifar100' else (1000 if args.dataset == 'imagenet'
+                                                                 else (200 if args.dataset == 'tiny-imagenet' else 10))
 
     params.norm = args.discriminator_norm
     params.after_norm = args.discriminator_after_norm
@@ -239,7 +244,7 @@ def main():
     parser.add_argument("--lr", default=2e-4, type=float, help="Learning rate")
     parser.add_argument("--beta1", default=0, type=float, help='Adam parameter')
     parser.add_argument("--beta2", default=0.9, type=float, help='Adam parameter')
-    parser.add_argument("--dataset", default='cifar10', choices=['mnist', 'cifar10', 'cifar100', 'fashion-mnist', 'stl10', 'imagenet'],
+    parser.add_argument("--dataset", default='cifar10', choices=['mnist', 'cifar10', 'cifar100', 'fashion-mnist', 'stl10', 'imagenet', 'tiny-imagenet'],
                         help='Dataset to train on')
     parser.add_argument("--arch", default='res', choices=['res', 'dcgan'], help="Gan architecture resnet or dcgan.")
 
@@ -304,7 +309,7 @@ def main():
 
     args.image_shape = (28, 28, 1) if args.dataset.endswith('mnist') else \
                        ((48, 48, 3) if args.dataset == 'stl10' else\
-                       ((64, 64, 3) if args.dataset == 'imagenet' else (32, 32, 3)))
+                       ((64, 64, 3) if args.dataset.endswith('imagenet') else (32, 32, 3)))
     args.fid_cache_file = "output/%s_fid.npz" % args.dataset
 
     discriminator_params = get_discriminator_params(args)
