@@ -5,7 +5,7 @@ from skimage.transform import resize
 from skimage import img_as_ubyte
 from tqdm import tqdm
 from skimage.io import imread
-
+from skimage.color import gray2rgb
 
 def load_data():
     """Loads tiny-imagenet dataset.
@@ -15,10 +15,10 @@ def load_data():
         ValueError: in case of invalid `label_mode`.
     """
 
-    dirname = 'tiny-imagenet-200'
-    origin = 'cs231n.stanford.edu/tiny-imagenet-200.zip'
-    path = get_file(dirname, origin=origin, untar=True, cache_dir='.')
-
+#    dirname = 'tiny-imagenet-200' 
+    origin = 'http://cs231n.stanford.edu/tiny-imagenet-200.zip'
+    path = get_file('tiny-imagenet-200.zip', origin=origin, extract=True, cache_dir='.', archive_format='zip')
+    path = path.replace('.zip', '')
 
     def load_train_images():
         subdir = 'train'
@@ -33,24 +33,31 @@ def load_data():
         for cls in tqdm(os.listdir(os.path.join(path, subdir))):
             for img in os.listdir(os.path.join(path, subdir, cls, 'images')):
                 name = os.path.join(path, subdir, cls, 'images', img)
-                X[i] = imread(name)
+                image = imread(name)
+                if len(image.shape) == 2:
+                    image = gray2rgb(image)
+                X[i] = image
                 Y[i] = classes[cls]
-            i += 1
-
+                i += 1
+        print i
         return X, Y
 
     def load_test_images():
-        X = np.empty((50 * 100, 64, 64, 3), dtype='unit8')
+        X = np.empty((200 * (50 + 50), 64, 64, 3), dtype='uint8')
         Y = None
         i = 0
         for subdir in ('val', 'test'):
-            for img in os.listdir(os.path.join(path, subdir, 'images')):
+            for img in tqdm(os.listdir(os.path.join(path, subdir, 'images'))):
                 name = os.path.join(path, subdir, 'images', img)
-                X[i] = imread(name)
+                image = imread(name)
+                if len(image.shape) == 2:
+                    image = gray2rgb(image)
+                X[i] = image
                 i += 1
+        print i
         return X, Y
-
+    print ("Loading images...")
     X_train, Y_train = load_train_images()
     X_test, Y_test = load_test_images()
 
-    return (X_train, Y_train), X_test, Y_test
+    return (X_train, Y_train), (X_test, Y_test)
