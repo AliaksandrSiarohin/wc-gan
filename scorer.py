@@ -46,7 +46,7 @@ def compute_scores(epoch, image_shape, generator, dataset, images_inception=5000
         print (str)
         if log_file is not None:
             with open(log_file, 'a') as f:
-                print >>f, ("Epoch %s " % (epoch, )) + str + " " + additional_info
+                print >>f, ("Epoch %s " % (epoch, )) + str #+ " " + additional_info
 
     if compute_fid:
         true_images = 127.5 * dataset._X_test + 127.5
@@ -55,4 +55,4 @@ def compute_scores(epoch, image_shape, generator, dataset, images_inception=5000
         print (str)
         if log_file is not None:
             with open(log_file, 'a') as f:
-                print >>f, ("Epoch %s " % (epoch, )) + str + " " + additional_info
+                print >>f, ("Epoch %s " % (epoch, )) + str #+ " " + additional_info
