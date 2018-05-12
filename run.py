@@ -6,7 +6,6 @@ from gan.train import Trainer
 from gan.ac_gan import AC_GAN
 from gan.projective_gan import ProjectiveGAN
 from gan.gan import GAN
-from gan.conditional_layers import ConditionalAdamOptimizer
 
 import os
 import json
@@ -23,8 +22,6 @@ from keras.backend import tf as ktf
 
 
 def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
-#    assert dataset in ['imagenet', 'mnist', 'cifar10', 'cifar100', 'fashion-mnist', 'stl10']
-
     if dataset == 'mnist':
         from keras.datasets import mnist
         (X, y), (X_test, y_test) = mnist.load_data()
@@ -59,13 +56,8 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
 def compile_and_run(dataset, args, generator_params, discriminator_params):
     additional_info = json.dumps(vars(args))
 
-    if args.cond_optim:
-        args.generator_optimizer = ConditionalAdamOptimizer(lr_decay_schedule=args.lr_decay_schedule, lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
-        args.discriminator_optimizer = Adam(lr=args.lr, beta_1=args.beta1, beta_2=args.beta2)
-
-    else:
-        args.generator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
-        args.discriminator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
+    args.generator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
+    args.discriminator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
 
     log_file = os.path.join(args.output_dir, 'log.txt')
 
@@ -86,10 +78,10 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
     discriminator.summary()
 
     if generator_checkpoint is not None:
-        generator.load_weights(generator_checkpoint)#, by_name=True)
+        generator.load_weights(generator_checkpoint)
 
     if discriminator_checkpoint is not None:
-        discriminator.load_weights(discriminator_checkpoint, by_name=True)
+        discriminator.load_weights(discriminator_checkpoint)
 
     hook = partial(at_store_checkpoint_hook, generator=generator)
 
@@ -112,7 +104,7 @@ def get_lr_decay_schedule(args):
     if args.lr_decay_schedule is None:
         lr_decay_schedule_generator = lambda iter: 1.
         lr_decay_schedule_discriminator = lambda iter: 1.
-    elif args.lr_decay_schedule == 'linear' or args.lr_decay_schedule.startswith("dropatc"):
+    elif args.lr_decay_schedule == 'linear':
         lr_decay_schedule_generator = lambda iter: K.maximum(0., 1. - K.cast(iter, 'float32') / number_of_iters_generator)
         lr_decay_schedule_discriminator = lambda iter: K.maximum(0., 1. - K.cast(iter, 'float32') / number_of_iters_discriminator)
     elif args.lr_decay_schedule == 'half-linear':
@@ -173,8 +165,8 @@ def get_generator_params(args):
             params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
     else:
         assert args.dataset != 'imagenet'
-        params.block_sizes = ([args.generator_filters / 2, args.generator_filters / 4] if args.dataset.endswith('mnist')
-                              else [args.generator_filters / 2, args.generator_filters / 4, args.generator_filters / 8])
+        params.block_sizes = ([args.generator_filters, args.generator_filters / 2] if args.dataset.endswith('mnist')
+                              else [args.generator_filters, args.generator_filters / 2, args.generator_filters / 4])
         params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
     params.number_of_classes = 100 if args.dataset == 'cifar100' else (1000 if args.dataset == 'imagenet'
                                                                  else (200 if args.dataset == 'tiny-imagenet' else 10))
@@ -247,7 +239,6 @@ def main():
     parser.add_argument("--generator_batch_multiple", default=2, type=int,
                         help="Size of the generator batch, multiple of batch_size.")
 
-    parser.add_argument("--cond_optim", default=0, type=int, help="If true, decrease lr for cond layers.")
     parser.add_argument("--lr", default=2e-4, type=float, help="Learning rate")
     parser.add_argument("--beta1", default=0, type=float, help='Adam parameter')
     parser.add_argument("--beta2", default=0.9, type=float, help='Adam parameter')
@@ -261,16 +252,16 @@ def main():
     parser.add_argument("--conv_singular", default=0, type=int, help='Singular convolution layer')
     parser.add_argument("--filters_emb", default=10, type=int, help='Number of inner filters in factorized conv.')
 
-    parser.add_argument("--generator_block_norm", default='u', choices=['n', 'b', 'd', 'dr'],
+    parser.add_argument("--generator_block_norm", default='b', choices=['n', 'b', 'd', 'dr'],
                         help='Normalization in generator resblock. b - batch, d - decorelation, n - none.')
-    parser.add_argument("--generator_block_after_norm", default='n', choices=['ccs', 'fconv', 'ucs', 'uccs', 'ufconv', 'cconv', 'uconv', 'ucconv','ccsuconv', 'n'],
+    parser.add_argument("--generator_block_after_norm", default='ucs', choices=['ccs', 'fconv', 'ucs', 'uccs', 'ufconv', 'cconv', 'uconv', 'ucconv','ccsuconv', 'n'],
                         help="Layer after normalization")
 
     parser.add_argument("--generator_last_norm", default='b', choices=['n', 'b', 'd', 'dr'],
                         help='Batch normalization in generator last. cb - conditional batch,'
                              ' ub - unconditional batch, n - none.'
                              'conv - conv11 after uncoditional, d - decorelation.')
-    parser.add_argument("--generator_last_after_norm", default='n', choices=['ccs', 'ucs', 'uccs', 'ufconv', 'cconv', 'uconv', 'ucconv', 'ccsuconv', 'n'],
+    parser.add_argument("--generator_last_after_norm", default='ucs', choices=['ccs', 'ucs', 'uccs', 'ufconv', 'cconv', 'uconv', 'ucconv', 'ccsuconv', 'n'],
                         help="Layer after normalization")
 
     parser.add_argument("--generator_renorm_for_decor", default=0, type=int, help='Renorm for decorelation normalization')
