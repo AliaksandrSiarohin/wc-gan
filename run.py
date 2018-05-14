@@ -161,13 +161,13 @@ def get_generator_params(args):
     first_block_w = (7 if args.dataset.endswith('mnist') else (6 if args.dataset == 'stl10' else 4))
     params.first_block_shape = (first_block_w, first_block_w, args.generator_filters)
     if args.arch == 'res':
-        if args.dataset == 'imagenet':
-            params.block_sizes = [args.generator_filters, args.generator_filters / 2, args.generator_filters / 2,
-                                  args.generator_filters / 4]
+        if args.dataset.endswith('imagenet'):
+            params.block_sizes = [args.generator_filters, args.generator_filters, args.generator_filters,
+                                  args.generator_filters]
             params.resamples = ("UP", "UP", "UP", "UP")
-        elif args.dataset == 'tiny-imagenet':
-            params.block_sizes = tuple([args.generator_filters] * 4)
-            params.resamples = ("UP", "UP", "UP", "UP")
+#        elif args.dataset == 'tiny-imagenet':
+#            params.block_sizes = tuple([args.generator_filters] * 4)
+#            params.resamples = ("UP", "UP", "UP", "UP")
         else:
             params.block_sizes = tuple([args.generator_filters] * 2) if args.dataset.endswith('mnist') else tuple([args.generator_filters] * 3)
             params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
@@ -202,14 +202,14 @@ def get_discriminator_params(args):
     params.input_image_shape = args.image_shape
     params.input_cls_shape = (1, )
     if args.arch == 'res':
-        if args.dataset == 'imagenet':
+        if args.dataset.endswith('imagenet'):
             params.block_sizes = [args.discriminator_filters / 16, args.discriminator_filters / 8, args.discriminator_filters / 4,
                                   args.discriminator_filters / 2, args.discriminator_filters]
-            params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "DOWN")
-        elif args.dataset == 'tiny-imagenet':
-            params.resamples = ("DOWN", "DOWN", "DOWN", "SAME", "SAME")
-            params.block_sizes = [args.discriminator_filters / 4, args.discriminator_filters / 2, args.discriminator_filters,
-                                  args.discriminator_filters, args.discriminator_filters]      
+            params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "SAME")
+#        elif args.dataset == 'tiny-imagenet':
+#            params.resamples = ("DOWN", "DOWN", "DOWN", "SAME", "SAME")
+#            params.block_sizes = [args.discriminator_filters / 4, args.discriminator_filters / 2, args.discriminator_filters,
+#                                  args.discriminator_filters, args.discriminator_filters]      
         else:
             params.block_sizes = tuple([args.discriminator_filters] * 4)
             params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
