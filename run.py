@@ -47,7 +47,7 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
         (X, y), (X_test, y_test) = load_data()
     elif dataset == 'imagenet':
         from imagenet import ImageNetdataset
-        return ImageNetdataset('../ILSVRC2012/train64/lanczos/', batch_size=batch_size, noise_size=noise_size)
+        return ImageNetdataset('../ILSVRC2012/train', batch_size=batch_size, noise_size=noise_size)
 
     return LabeledArrayDataset(X=X, y=y if supervised else None, X_test=X_test, y_test=y_test,
                                batch_size=batch_size, noise_size=noise_size)
@@ -86,10 +86,13 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
     hook = partial(at_store_checkpoint_hook, generator=generator)
 
     if args.phase == 'train':
+        preprocess_fn = lambda x: (tf.cast(x, 'float32') - 127.5) / 127.5 + tf.random.unform(x.shape, 0, 1/128.0) 
+        preprocess_fn = None if args.image_size[0] == 128 else preprocess_fn
         GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN}
         gan = GANS[args.gan_type](generator=generator, discriminator=discriminator,
                                                 lr_decay_schedule_discriminator = lr_decay_schedule_discriminator,
                                                 lr_decay_schedule_generator = lr_decay_schedule_generator,
+                                                preprocess_fn = preprocess_fn,
                                                 **vars(args))
         trainer = Trainer(dataset, gan, at_store_checkpoint_hook=hook,**vars(args))
         trainer.train()
@@ -153,13 +156,14 @@ def get_generator_params(args):
     first_block_w = (7 if args.dataset.endswith('mnist') else (6 if args.dataset == 'stl10' else 4))
     params.first_block_shape = (first_block_w, first_block_w, args.generator_filters)
     if args.arch == 'res':
-        if args.dataset.endswith('imagenet'):
+        if args.dataset == 'tiny-imagenet':
             params.block_sizes = [args.generator_filters, args.generator_filters, args.generator_filters,
                                   args.generator_filters]
             params.resamples = ("UP", "UP", "UP", "UP")
-#        elif args.dataset == 'tiny-imagenet':
-#            params.block_sizes = tuple([args.generator_filters] * 4)
-#            params.resamples = ("UP", "UP", "UP", "UP")
+        elif args.dataset.endswith('imagenet'):
+            params.block_sizes =  [args.generator_filters, args.generator_filters / 2, args.generator_filters / 4,
+                                  args.generator_filters / 8, args.generator_filters / 16]
+            params.resamples = ("UP", "UP", "UP", "UP", "UP")
         else:
             params.block_sizes = tuple([args.generator_filters] * 2) if args.dataset.endswith('mnist') else tuple([args.generator_filters] * 3)
             params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
@@ -194,15 +198,16 @@ def get_discriminator_params(args):
     params.input_image_shape = args.image_shape
     params.input_cls_shape = (1, )
     if args.arch == 'res':
-        if args.dataset.endswith('imagenet'):
+       if args.dataset == 'tiny-imagenet':
+            params.resamples = ("DOWN", "DOWN", "DOWN", "SAME", "SAME")
+            params.block_sizes = [args.discriminator_filters / 4, args.discriminator_filters / 2, args.discriminator_filters,
+                                  args.discriminator_filters, args.discriminator_filters]      
+       elif args.dataset.endswith('imagenet'):
+        
             params.block_sizes = [args.discriminator_filters / 16, args.discriminator_filters / 8, args.discriminator_filters / 4,
-                                  args.discriminator_filters / 2, args.discriminator_filters]
-            params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "SAME")
-#        elif args.dataset == 'tiny-imagenet':
-#            params.resamples = ("DOWN", "DOWN", "DOWN", "SAME", "SAME")
-#            params.block_sizes = [args.discriminator_filters / 4, args.discriminator_filters / 2, args.discriminator_filters,
-#                                  args.discriminator_filters, args.discriminator_filters]      
-        else:
+                                  args.discriminator_filters / 2, args.discriminator_filters, args.discriminator_filters]
+            params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "SAME")
+       else:
             params.block_sizes = tuple([args.discriminator_filters] * 4)
             params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
     else:
@@ -304,10 +309,18 @@ def main():
         os.makedirs(args.output_dir)
     with open(os.path.join(args.output_dir, 'config.json'), 'w') as outfile:
         json.dump(vars(args), outfile, indent=4)
+    
 
-    args.image_shape = (28, 28, 1) if args.dataset.endswith('mnist') else \
-                       ((48, 48, 3) if args.dataset == 'stl10' else\
-                       ((64, 64, 3) if args.dataset.endswith('imagenet') else (32, 32, 3)))
+    image_shape_dict = {'mnist' : (28, 28, 1),
+                        'fashion-mnist' : (28, 28, 1),
+                        'cifar10' : (32, 32, 3),
+                        'cifar100' : (32, 32, 3),
+                        'stl10' : (48, 48, 3),
+                        'imagenet' : (128, 128, 3),
+                        'tiny-imagenet' : (64, 64, 3)}
+
+    args.image_shape = image_shape_dict[args.dataset]
+    print ("Image shape %s x %s x %s" % args.image_shape)
     args.fid_cache_file = "output/%s_fid.npz" % args.dataset
 
     discriminator_params = get_discriminator_params(args)

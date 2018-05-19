@@ -43,10 +43,10 @@ def load_data():
         return X, Y
 
     def load_test_images():
-        X = np.empty((200 * (50 + 50), 64, 64, 3), dtype='uint8')
+        X = np.empty((100 * (50 + 50), 64, 64, 3), dtype='uint8')
         Y = None
         i = 0
-        for subdir in ('val', 'test'):
+        for subdir in ('test', ):
             for img in tqdm(os.listdir(os.path.join(path, subdir, 'images'))):
                 name = os.path.join(path, subdir, 'images', img)
                 image = imread(name)
