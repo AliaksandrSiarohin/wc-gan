@@ -86,13 +86,10 @@ def compile_and_run(dataset, args, generator_params, discriminator_params):
     hook = partial(at_store_checkpoint_hook, generator=generator)
 
     if args.phase == 'train':
-        preprocess_fn = lambda x: (tf.cast(x, 'float32') - 127.5) / 127.5 + tf.random.unform(x.shape, 0, 1/128.0) 
-        preprocess_fn = None if args.image_size[0] == 128 else preprocess_fn
         GANS = {None:GAN, 'AC_GAN':AC_GAN, 'PROJECTIVE':ProjectiveGAN}
         gan = GANS[args.gan_type](generator=generator, discriminator=discriminator,
                                                 lr_decay_schedule_discriminator = lr_decay_schedule_discriminator,
                                                 lr_decay_schedule_generator = lr_decay_schedule_generator,
-                                                preprocess_fn = preprocess_fn,
                                                 **vars(args))
         trainer = Trainer(dataset, gan, at_store_checkpoint_hook=hook,**vars(args))
         trainer.train()
