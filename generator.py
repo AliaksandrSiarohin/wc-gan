@@ -1,15 +1,12 @@
 from keras.models import Input, Model
-from keras.layers import Dense, Reshape, Activation, Conv2D, GlobalAveragePooling2D, Layer, Deconv2D
-from keras.layers import BatchNormalization, Add, Embedding, Concatenate, UpSampling2D, AveragePooling2D, Subtract
+from keras.layers import Dense, Reshape, Activation, Conv2D, Deconv2D
+from keras.layers import BatchNormalization, Add, Embedding, Concatenate
 
 import numpy as np
-from gan.layer_utils import glorot_init
-
-from gan.conditional_layers import ConditinalBatchNormalization, cond_resblock, ConditionalConv11, ConditionalDepthwiseConv2D, get_separable_conv,\
-                                   DecorelationNormalization, ConditionalCenterScale, CenterScale, cond_dcblock, FactorizedConditionalConv11
-
 import keras.backend as K
-from functools import partial
+
+from gan.layer_utils import glorot_init, resblock, dcblock
+from gan.conditional_layers import ConditionalConv11, DecorelationNormalization, ConditionalCenterScale, CenterScale, FactorizedConditionalConv11
 
 
 def create_norm(norm, after_norm, cls=None, number_of_classes=None, filters_emb = 10,
@@ -25,8 +22,6 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None, filters_emb 
         norm_layer = lambda axis, name: DecorelationNormalization(name=name)
     elif norm == 'dr':
         norm_layer = lambda axis, name: DecorelationNormalization(name=name, renorm=True)
-
-
 
     if after_norm == 'ccs':
         after_norm_layer = lambda axis, name: lambda x: ConditionalCenterScale(number_of_classes=number_of_classes,
@@ -120,15 +115,14 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
     last_norm_layer = create_norm(last_norm, last_after_norm, cls=cls,
                              number_of_classes=number_of_classes, filters_emb=filters_emb)
 
-
     i = 0
     for block_size, resample in zip(block_sizes, resamples):
         if arch == 'res':
-            y = cond_resblock(y, kernel_size=(3, 3), resample=resample,
+            y = resblock(y, kernel_size=(3, 3), resample=resample,
                               nfilters=block_size, name='Generator.' + str(i),
                               norm=block_norm_layer, is_first=False)
         else:
-            y = cond_dcblock(y, kernel_size=(4, 4), resample=resample,
+            y = dcblock(y, kernel_size=(4, 4), resample=resample,
                               nfilters=block_size, name='Generator.' + str(i),
                               norm=block_norm_layer, is_first=False, conv_layer=Deconv2D)
         i += 1

@@ -2,7 +2,8 @@ from keras.models import Input, Model
 from keras.layers import Dense, Activation, Conv2D, GlobalAveragePooling2D, Lambda, Dropout, Flatten
 from keras.layers import Add, Embedding, LeakyReLU
 
-from gan.conditional_layers import cond_resblock, ConditionalConv11, cond_dcblock
+from gan.layer_utils import resblock, dcblock
+from gan.conditional_layers import ConditionalConv11
 from gan.spectral_normalized_layers import SNConv2D, SNDense, SNConditionalConv11, SNEmbeding
 from gan.layer_utils import glorot_init, GlobalSumPooling2D
 from functools import partial
@@ -45,11 +46,11 @@ def make_discriminator(input_image_shape, input_cls_shape=(1, ), block_sizes=(12
     i = 0
     for block_size, resample in zip(block_sizes, resamples):
         if arch == 'res':
-            y = cond_resblock(y, kernel_size=(3, 3), resample=resample, nfilters=block_size,
+            y = resblock(y, kernel_size=(3, 3), resample=resample, nfilters=block_size,
                               name='Discriminator.' + str(i), norm=norm_layer, is_first=(i == 0), conv_layer=conv_layer)
             i += 1
         else:
-            y = cond_dcblock(y, kernel_size=(3, 3) if resample == "SAME" else (4, 4), resample=resample, nfilters=block_size,
+            y = dcblock(y, kernel_size=(3, 3) if resample == "SAME" else (4, 4), resample=resample, nfilters=block_size,
                               name='Discriminator.' + str(i), norm=norm_layer, is_first=(i == 0), conv_layer=conv_layer)
             i += 1
 

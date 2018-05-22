@@ -51,14 +51,15 @@ def compute_scores(epoch, image_shape, generator, dataset, images_inception=5000
     images *= 127.5
     images += 127.5
 
-    draw_grid(os.path.join(os.path.dirname(log_file), "epoch_%s_imagegrid.png" % epoch), images, labels if conditional else None)
-
     def to_rgb(array):
         if array.shape[-1] != 3:
             #hack for grayscale mnist
             return np.concatenate([array, array, array], axis=-1)
         else:
             return array
+
+    draw_grid(os.path.join(os.path.dirname(log_file), "epoch_%s_imagegrid.png" % epoch),
+              to_rgb(images), labels if conditional else None)
 
     if compute_inception:
         str = "INCEPTION SCORE: %s, %s" % get_inception_score(to_rgb(images[:images_inception]))
