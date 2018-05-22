@@ -18,9 +18,6 @@ from generator import make_generator
 from discriminator import make_discriminator
 
 from keras import backend as K
-from keras.backend import tf as ktf
-
-import numpy as np
 
 def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
     if dataset == 'mnist':
@@ -302,10 +299,6 @@ def main():
     parser.add_argument("--samples_inception", default=50000, type=int, help='Samples for IS score, 0 - no compute inception')
     parser.add_argument("--samples_fid", default=10000, type=int, help="Samples for FID score, 0 - no compute FID")
     
-    parser.add_argument("--seed", default=0, type=int, help='Random seed')
-
-    np.random.seed(0)
-
     args = parser.parse_args()
 
     dataset = get_dataset(dataset=args.dataset,
