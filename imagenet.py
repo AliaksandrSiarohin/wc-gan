@@ -53,7 +53,7 @@ class ImageNetdataset(LabeledArrayDataset):
             return image
  
         image_index = 0
-        for bucket_index in range(len(names) / bucket_size  + 1):
+        for bucket_index in range(len(names) / bucket_size + 1):
             bfile = os.path.join(self.cache_dir, 'bucket_%s.npz' % bucket_index)
             if os.path.exists(bfile):
                 image_index += bucket_size

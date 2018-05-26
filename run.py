@@ -18,6 +18,7 @@ from generator import make_generator
 from discriminator import make_discriminator
 
 from keras import backend as K
+from keras.backend import tf as ktf
 
 def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
     if dataset == 'mnist':
@@ -54,8 +55,8 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
 def compile_and_run(dataset, args, generator_params, discriminator_params):
     additional_info = json.dumps(vars(args))
 
-    args.generator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
-    args.discriminator_optimizer = Adam(args.lr, beta_1=args.beta1, beta_2=args.beta2)
+    args.generator_optimizer = Adam(args.generator_lr, beta_1=args.beta1, beta_2=args.beta2)
+    args.discriminator_optimizer = Adam(args.discriminator_lr, beta_1=args.beta1, beta_2=args.beta2)
 
     log_file = os.path.join(args.output_dir, 'log.txt')
 
@@ -219,7 +220,7 @@ def get_discriminator_params(args):
     params.norm = args.discriminator_norm
     params.after_norm = args.discriminator_after_norm
 
-    params.spectral = args.spectral
+    params.spectral = args.discriminator_spectral
     params.fully_diff_spectral = args.fully_diff_spectral
     params.spectral_iterations = args.spectral_iterations
     params.conv_singular = args.conv_singular
@@ -246,7 +247,9 @@ def main():
                         help='Dataset to train on')
     parser.add_argument("--arch", default='res', choices=['res', 'dcgan'], help="Gan architecture resnet or dcgan.")
 
-    parser.add_argument("--lr", default=2e-4, type=float, help="Learning rate")
+    parser.add_argument("--generator_lr", default=2e-4, type=float, help="Learning rate")
+    parser.add_argument("--discriminator_lr", default=2e-4, type=float, help="Learning rate")
+
     parser.add_argument("--beta1", default=0, type=float, help='Adam parameter')
     parser.add_argument("--beta2", default=0.9, type=float, help='Adam parameter')
     parser.add_argument("--lr_decay_schedule", default=None,
@@ -258,7 +261,7 @@ def main():
                              'dropat30 - drop lr 10 times at 30 epoch (any number insdead of 30 allowed).')
 
     parser.add_argument("--generator_spectral", default=0, type=int, help='Use spectral norm in generator.')
-    parser.add_argument("--spectral", default=0, type=int, help='Use spectral norm in discriminator.')
+    parser.add_argument("--discriminator_spectral", default=0, type=int, help='Use spectral norm in discriminator.')
  
     parser.add_argument("--fully_diff_spectral", default=0, type=int, help='Fully difirentiable spectral normalization.')
     parser.add_argument("--spectral_iterations", default=1, type=int, help='Number of iteration per spectral update.')
@@ -312,7 +315,7 @@ def main():
                           supervised=args.gan_type is not None)
 
     args.output_dir = "output/%s_%s_%s_%s_%s_%s" % (args.dataset, args.arch, args.phase,
-                                                    'sn' if args.spectral else ('wgan' if args.gradient_penalty_weight != 0 else 'other'),
+                                                    'sn' if args.discriminator_spectral else ('wgan' if args.gradient_penalty_weight != 0 else 'other'),
                                                     'uncond' if args.gan_type is None else 'cond', time())
     args.checkpoints_dir = args.output_dir
     if not os.path.exists(args.output_dir):
