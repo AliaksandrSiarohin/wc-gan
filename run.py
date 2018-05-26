@@ -45,7 +45,7 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
         (X, y), (X_test, y_test) = load_data()
     elif dataset == 'imagenet':
         from imagenet import ImageNetdataset
-        return ImageNetdataset('../ILSVRC2012/train', batch_size=batch_size, noise_size=noise_size)
+        return ImageNetdataset('../ILSVRC2012/train', '../ILSVRC2012/val', batch_size=batch_size, noise_size=noise_size)
 
     return LabeledArrayDataset(X=X, y=y if supervised else None, X_test=X_test, y_test=y_test,
                                batch_size=batch_size, noise_size=noise_size)
@@ -195,10 +195,9 @@ def get_discriminator_params(args):
             params.resamples = ("DOWN", "DOWN", "DOWN", "SAME", "SAME")
             params.block_sizes = [args.discriminator_filters / 4, args.discriminator_filters / 2, args.discriminator_filters,
                                   args.discriminator_filters, args.discriminator_filters]      
-       elif args.dataset.endswith('imagenet'):
-        
-            params.block_sizes = [args.discriminator_filters / 16, args.discriminator_filters / 8, args.discriminator_filters / 4,
-                                  args.discriminator_filters / 2, args.discriminator_filters, args.discriminator_filters]
+       elif args.dataset.endswith('imagenet'):        
+            params.block_sizes = [args.discriminator_filters / 32, args.discriminator_filters / 16, args.discriminator_filters / 8,
+                                  args.discriminator_filters / 4, args.discriminator_filters / 2, args.discriminator_filters]
             params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "SAME")
        else:
             params.block_sizes = tuple([args.discriminator_filters] * 4)

@@ -10,7 +10,7 @@ from PIL import ImageFile
 from skimage.color import gray2rgb
 
 class ImageNetdataset(LabeledArrayDataset):
-    def __init__(self, folder_train, batch_size=64, conditional=True,
+    def __init__(self, folder_train, folder_val, batch_size=64, conditional=True,
                  noise_size=(128, ), image_size = (128, 128)):
         ImageFile.LOAD_TRUNCATED_IMAGES = True
         self.classes = os.listdir(folder_train)
@@ -18,6 +18,7 @@ class ImageNetdataset(LabeledArrayDataset):
         self.cache_dir = 'img_net_cache_' + str(image_size[0])
         self.conditional = conditional
         self.folder_train = folder_train
+        self.folder_val = folder_val
         
         self._noise_size = noise_size
         self._batch_size = batch_size
@@ -41,6 +42,14 @@ class ImageNetdataset(LabeledArrayDataset):
         names, labels = shuffle(image_names, image_classes, random_state = 0)
         print ("Number of images %s, of classes %s" % (len(names), len(np.unique(labels))))
         print ("Preprocessing images...")
+        def preprocess_image(name):
+            image = imread(name)
+            if len(image.shape) == 2:
+                image = gray2rgb(image)
+            if image.shape[2] == 4:
+                image = image[:,:,:3]
+            return resize(image, self.image_size, preserve_range=True).astype('uint8')
+        
         image_index = 0
         for bucket_index in range(len(names) / bucket_size  + 1):
             bfile = os.path.join(self.cache_dir, 'bucket_%s.npz' % bucket_index)
@@ -52,14 +61,20 @@ class ImageNetdataset(LabeledArrayDataset):
             X = np.empty((end - image_index,) + self.image_size + (3,), dtype='uint8')
             Y = np.expand_dims(labels[image_index:end], axis=1)
             for i in trange(0, end - image_index):
-                image = imread(names[image_index])
-                if len(image.shape) == 2:
-                   image = gray2rgb(image)
-                if image.shape[2] == 4:
-                    image = image[:,:,:3]
-                X[i] = resize(image, self.image_size, preserve_range=True).astype('uint8')
+                X[i] = preprocess_image(names[image_index])
                 image_index += 1
-            np.savez(bfile, x=X, y=Y)     
+            np.savez(bfile, x=X, y=Y)
+        
+        print ("Preprocessing val...")
+        val_names = os.listdir(self.folder_val)
+        X = np.empty((len(val_names), ) + self.image_size + (3, ), dtype='uint8')
+        bfile = os.path.join(self.cache_dir, 'bucket_val.npz')
+        if not os.path.exists(bfile):
+            
+            for i in trange(0, len(val_names)):
+                name = os.path.join(self.folder_val, val_names[i])
+                X[i] = preprocess_image(name)
+            np.savez(bfile, x=X)
 
     def load_images_in_memmory(self, bucket_index):
         f = np.load(os.path.join(self.cache_dir, 'bucket_%s.npz' % bucket_index))
@@ -82,5 +97,7 @@ class ImageNetdataset(LabeledArrayDataset):
 
     @property
     def _X_test(self):
-        #number_of_images = 10000
-	return self._X[:10000]
+        f = np.load(os.path.join(self.cache_dir, 'bucket_val.npz'))
+        X_test = f['x']
+        return X_test
+        
