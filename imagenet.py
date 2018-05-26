@@ -16,6 +16,7 @@ class ImageNetdataset(LabeledArrayDataset):
         self.classes = os.listdir(folder_train)
         self.number_of_classes = len(self.classes)
         self.cache_dir = 'img_net_cache_' + str(image_size[0])
+
         self.conditional = conditional
         self.folder_train = folder_train
         self.folder_val = folder_val
@@ -48,14 +49,14 @@ class ImageNetdataset(LabeledArrayDataset):
                 image = gray2rgb(image)
             if image.shape[2] == 4:
                 image = image[:,:,:3]
-            return resize(image, self.image_size, preserve_range=True).astype('uint8')
-        
+            image = resize(image, self.image_size, preserve_range=True).astype('uint8')
+            return image
+ 
         image_index = 0
         for bucket_index in range(len(names) / bucket_size  + 1):
             bfile = os.path.join(self.cache_dir, 'bucket_%s.npz' % bucket_index)
             if os.path.exists(bfile):
                 image_index += bucket_size
-                continue
                                 
             end = min(image_index + bucket_size, len(names))
             X = np.empty((end - image_index,) + self.image_size + (3,), dtype='uint8')
@@ -64,7 +65,7 @@ class ImageNetdataset(LabeledArrayDataset):
                 X[i] = preprocess_image(names[image_index])
                 image_index += 1
             np.savez(bfile, x=X, y=Y)
-        
+ 
         print ("Preprocessing val...")
         val_names = os.listdir(self.folder_val)
         X = np.empty((len(val_names), ) + self.image_size + (3, ), dtype='uint8')
@@ -89,10 +90,9 @@ class ImageNetdataset(LabeledArrayDataset):
         values[0] += np.random.uniform(0, 1/128.0, size=values[0].shape)
         return values
 
- 
     def _shuffle_data(self):
         self.load_images_in_memmory(self.bucket_index)
-        #print  len(os.listdir(self.cache_dir)) 
+        super(ImageNetdataset, self)._shuffle_data()
         self.bucket_index = (self.bucket_index + 1) % len(os.listdir(self.cache_dir))
 
     @property

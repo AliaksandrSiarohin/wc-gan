@@ -156,7 +156,7 @@ def get_generator_params(args):
                                   args.generator_filters]
             params.resamples = ("UP", "UP", "UP", "UP")
         elif args.dataset.endswith('imagenet'):
-            params.block_sizes = [args.generator_filters, args.generator_filters / 2, args.generator_filters / 4,
+            params.block_sizes = [args.generator_filters, args.generator_filters, args.generator_filters / 4,
                                   args.generator_filters / 8, args.generator_filters / 16]
             params.resamples = ("UP", "UP", "UP", "UP", "UP")
         else:
@@ -178,6 +178,11 @@ def get_generator_params(args):
     params.last_norm = args.generator_last_norm
     params.last_after_norm = args.generator_last_after_norm
 
+    params.spectral = args.generator_spectral
+    params.fully_diff_spectral = args.fully_diff_spectral
+    params.spectral_iterations = args.spectral_iterations
+    params.conv_singular = args.conv_singular
+
     params.gan_type = args.gan_type
     
     params.arch = args.arch
@@ -198,7 +203,7 @@ def get_discriminator_params(args):
        elif args.dataset.endswith('imagenet'):        
             params.block_sizes = [args.discriminator_filters / 32, args.discriminator_filters / 16, args.discriminator_filters / 8,
                                   args.discriminator_filters / 4, args.discriminator_filters / 2, args.discriminator_filters]
-            params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "SAME")
+            params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN")
        else:
             params.block_sizes = tuple([args.discriminator_filters] * 4)
             params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
@@ -252,7 +257,9 @@ def main():
                              'linear-end - constant until 0.9, then linear decay to 0. '
                              'dropat30 - drop lr 10 times at 30 epoch (any number insdead of 30 allowed).')
 
+    parser.add_argument("--generator_spectral", default=0, type=int, help='Use spectral norm in generator.')
     parser.add_argument("--spectral", default=0, type=int, help='Use spectral norm in discriminator.')
+ 
     parser.add_argument("--fully_diff_spectral", default=0, type=int, help='Fully difirentiable spectral normalization.')
     parser.add_argument("--spectral_iterations", default=1, type=int, help='Number of iteration per spectral update.')
     parser.add_argument("--conv_singular", default=0, type=int, help='Use convolutional spectral normalization.')
