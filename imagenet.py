@@ -57,7 +57,7 @@ class ImageNetdataset(LabeledArrayDataset):
             bfile = os.path.join(self.cache_dir, 'bucket_%s.npz' % bucket_index)
             if os.path.exists(bfile):
                 image_index += bucket_size
-                                
+                continue                
             end = min(image_index + bucket_size, len(names))
             X = np.empty((end - image_index,) + self.image_size + (3,), dtype='uint8')
             Y = np.expand_dims(labels[image_index:end], axis=1)
@@ -71,7 +71,6 @@ class ImageNetdataset(LabeledArrayDataset):
         X = np.empty((len(val_names), ) + self.image_size + (3, ), dtype='uint8')
         bfile = os.path.join(self.cache_dir, 'bucket_val.npz')
         if not os.path.exists(bfile):
-            
             for i in trange(0, len(val_names)):
                 name = os.path.join(self.folder_val, val_names[i])
                 X[i] = preprocess_image(name)
@@ -93,7 +92,7 @@ class ImageNetdataset(LabeledArrayDataset):
     def _shuffle_data(self):
         self.load_images_in_memmory(self.bucket_index)
         super(ImageNetdataset, self)._shuffle_data()
-        self.bucket_index = (self.bucket_index + 1) % len(os.listdir(self.cache_dir))
+        self.bucket_index = (self.bucket_index + 1) % (len(os.listdir(self.cache_dir)) - 1)
 
     @property
     def _X_test(self):

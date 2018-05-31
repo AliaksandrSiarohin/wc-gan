@@ -157,7 +157,7 @@ def get_generator_params(args):
                                   args.generator_filters]
             params.resamples = ("UP", "UP", "UP", "UP")
         elif args.dataset.endswith('imagenet'):
-            params.block_sizes = [args.generator_filters, args.generator_filters, args.generator_filters / 4,
+            params.block_sizes = [args.generator_filters, args.generator_filters / 2, args.generator_filters / 4,
                                   args.generator_filters / 8, args.generator_filters / 16]
             params.resamples = ("UP", "UP", "UP", "UP", "UP")
         else:
@@ -203,8 +203,8 @@ def get_discriminator_params(args):
                                   args.discriminator_filters, args.discriminator_filters]      
        elif args.dataset.endswith('imagenet'):        
             params.block_sizes = [args.discriminator_filters / 32, args.discriminator_filters / 16, args.discriminator_filters / 8,
-                                  args.discriminator_filters / 4, args.discriminator_filters / 2, args.discriminator_filters]
-            params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN")
+                                  args.discriminator_filters / 4, args.discriminator_filters / 2, args.discriminator_filters, args.discriminator_filters]
+            params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "SAME")
        else:
             params.block_sizes = tuple([args.discriminator_filters] * 4)
             params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
