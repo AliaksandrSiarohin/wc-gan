@@ -1,6 +1,6 @@
 # Whitening and Coloring transform for GANs
 
-[Check out our paper]()
+[Check out our paper](https://arxiv.org/abs/1806.00420)
 <p>
   <table>
 	<tr>
