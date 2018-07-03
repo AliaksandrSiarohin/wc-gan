@@ -109,14 +109,14 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
         dence_layer = partial(SNDense,
                               fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
         emb_layer = partial(SNEmbeding, fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
-        #factor_conv_layer = partial(SNFactorizedConv11,
-        #                      fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
+        factor_conv_layer = partial(SNFactorizedConv11,
+                              fully_diff_spectral=fully_diff_spectral, spectral_iterations=spectral_iterations)
     else:
         conv_layer = Conv2D
         cond_conv_layer = ConditionalConv11
         dence_layer = Dense
         emb_layer = Embedding
-    factor_conv_layer = FactorizedConv11
+        factor_conv_layer = FactorizedConv11
 
     if concat_cls:
         y = emb_layer(input_dim=number_of_classes, output_dim=first_block_shape[-1])(cls)
@@ -130,12 +130,12 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
 
     block_norm_layer = create_norm(block_norm, block_after_norm, cls=cls,
                              number_of_classes=number_of_classes, filters_emb=filters_emb,
-                             uncoditional_conv_layer=Conv2D, conditional_conv_layer=cond_conv_layer,
+                             uncoditional_conv_layer=conv_layer, conditional_conv_layer=cond_conv_layer,
                              factor_conv_layer=factor_conv_layer)
 
     last_norm_layer = create_norm(last_norm, last_after_norm, cls=cls,
                              number_of_classes=number_of_classes, filters_emb=filters_emb,
-                             uncoditional_conv_layer=Conv2D, conditional_conv_layer=cond_conv_layer,
+                             uncoditional_conv_layer=conv_layer, conditional_conv_layer=cond_conv_layer,
                              factor_conv_layer=factor_conv_layer)
 
     i = 0
