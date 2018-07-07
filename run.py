@@ -46,7 +46,7 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
         (X, y), (X_test, y_test) = load_data()
     elif dataset == 'imagenet':
         from imagenet import ImageNetdataset
-        return ImageNetdataset('../ILSVRC2012/train', '../ILSVRC2012/val', batch_size=batch_size, noise_size=noise_size)
+        return ImageNetdataset('../imagenet-resized', '../imagenet-resized-val/val', batch_size=batch_size, noise_size=noise_size)
 
     return LabeledArrayDataset(X=X, y=y if supervised else None, X_test=X_test, y_test=y_test,
                                batch_size=batch_size, noise_size=noise_size)
@@ -202,9 +202,9 @@ def get_discriminator_params(args):
             params.block_sizes = [args.discriminator_filters / 4, args.discriminator_filters / 2, args.discriminator_filters,
                                   args.discriminator_filters, args.discriminator_filters]      
        elif args.dataset.endswith('imagenet'):        
-            params.block_sizes = [args.discriminator_filters / 32, args.discriminator_filters / 16, args.discriminator_filters / 8,
-                                  args.discriminator_filters / 4, args.discriminator_filters / 2, args.discriminator_filters, args.discriminator_filters]
-            params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "SAME")
+            params.block_sizes = [args.discriminator_filters / 16, args.discriminator_filters / 8, args.discriminator_filters / 4,
+                                  args.discriminator_filters / 2, args.discriminator_filters, args.discriminator_filters]
+            params.resamples = ("DOWN", "DOWN", "DOWN", "DOWN", "DOWN", "SAME")
        else:
             params.block_sizes = tuple([args.discriminator_filters] * 4)
             params.resamples = ('DOWN', "DOWN", "SAME", "SAME")
@@ -238,6 +238,7 @@ def get_discriminator_params(args):
 
 def main():
     parser = parser_with_default_args()
+    parser.add_argument("--name", default="gan", help="Name of the experiment (it will create corresponding folder)")
     parser.add_argument("--phase", choices=['train', 'test'], default='train',
                         help="Train or test, test only compute scores and generate grid of images."
                              "For test generator checkpoint should be given.")
@@ -303,6 +304,8 @@ def main():
                              "n - None.")
     parser.add_argument("--discriminator_filters", default=128, type=int, help='Base number of filters in discriminator block.')
     parser.add_argument("--discriminator_dropout", type=float, default=0, help="Use dropout in discriminator.")
+    parser.add_argument("--shred_disc_batch", type=int, default=0, help='Shred batch in discriminator to save memory')
+
     parser.add_argument("--sum_pool", default=1, type=int, help='Use sum or average pooling in discriminator.')
 
     parser.add_argument("--samples_inception", default=50000, type=int, help='Samples for IS score, 0 - no compute inception')
@@ -314,9 +317,8 @@ def main():
                           batch_size=args.batch_size,
                           supervised=args.gan_type is not None)
 
-    args.output_dir = "output/%s_%s_%s_%s_%s_%s" % (args.dataset, args.arch, args.phase,
-                                                    'sn' if args.discriminator_spectral else ('wgan' if args.gradient_penalty_weight != 0 else 'other'),
-                                                    'uncond' if args.gan_type is None else 'cond', time())
+    args.output_dir = "output/%s_%s_%s" % (args.name, args.phase, time())
+    print args.output_dir
     args.checkpoints_dir = args.output_dir
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)

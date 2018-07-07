@@ -85,7 +85,7 @@ class ImageNetdataset(LabeledArrayDataset):
 
     def _load_discriminator_data(self, index):
         values = super(ImageNetdataset, self)._load_discriminator_data(index)
-        values[0] = (values[0].astype('float32') - 127.5) / 127.5
+        values[0] = values[0].astype('float32') / 128.0 - 1
         values[0] += np.random.uniform(0, 1/128.0, size=values[0].shape)
         return values
 
