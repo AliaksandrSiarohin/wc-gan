@@ -47,7 +47,7 @@ def create_norm(norm, after_norm, cls=None, noise=None, number_of_classes=None, 
                                                                          name=name + '_c', filters=K.int_shape(x)[axis],
                                                                          filters_emb=filters_emb, use_bias=False)([x, cls])
     elif after_norm == 'uconv':
-        after_norm_layer = lambda axis, name: lambda x: unconditional_conv_layer(uncoditional_conv_layer(kernel_size=(1, 1),
+        after_norm_layer = lambda axis, name: lambda x: uncoditional_conv_layer(kernel_size=(1, 1),
                                                                                  filters=K.int_shape(x)[axis], name=name)(x)
     elif after_norm == 'ucconv':
         def after_norm_layer(axis, name):
@@ -142,12 +142,12 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
     y = dence_layer(units=np.prod(first_block_shape), kernel_initializer=glorot_init)(y)
     y = Reshape(first_block_shape)(y)
 
-    block_norm_layer = create_norm(block_norm, block_after_norm, cls=inp,
+    block_norm_layer = create_norm(block_norm, block_after_norm, cls=cls, noise=inp,
                              number_of_classes=number_of_classes, filters_emb=filters_emb,
                              uncoditional_conv_layer=conv_layer, conditional_conv_layer=cond_conv_layer,
                              factor_conv_layer=factor_conv_layer)
 
-    last_norm_layer = create_norm(last_norm, last_after_norm, cls=inp,
+    last_norm_layer = create_norm(last_norm, last_after_norm, cls=cls, noise=inp,
                              number_of_classes=number_of_classes, filters_emb=filters_emb,
                              uncoditional_conv_layer=conv_layer, conditional_conv_layer=cond_conv_layer,
                              factor_conv_layer=factor_conv_layer)
