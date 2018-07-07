@@ -1,4 +1,4 @@
-from keras.models import Input, Model
+from keras.models import Input, Model, Sequential
 from keras.layers import Dense, Reshape, Activation, Conv2D, Deconv2D
 from keras.layers import BatchNormalization, Add, Embedding, Concatenate
 
@@ -6,15 +6,15 @@ import numpy as np
 import keras.backend as K
 
 from gan.layer_utils import glorot_init, resblock, dcblock
-from gan.conditional_layers import ConditionalConv11, DecorelationNormalization, ConditionalCenterScale, CenterScale, FactorizedConv11
+from gan.conditional_layers import ConditionalConv11, DecorelationNormalization, ConditionalCenterScale, CenterScale, FactorizedConv11, NINConv11
 from gan.spectral_normalized_layers import SNConv2D, SNConditionalConv11, SNDense, SNEmbeding, SNFactorizedConv11
 from functools import partial
 
-def create_norm(norm, after_norm, cls=None, number_of_classes=None, filters_emb = 10,
+def create_norm(norm, after_norm, cls=None, noise=None, number_of_classes=None, filters_emb = 10,
                 uncoditional_conv_layer=Conv2D, conditional_conv_layer=ConditionalConv11,
                 factor_conv_layer=FactorizedConv11):
     assert norm in ['n', 'b', 'd', 'dr']
-    assert after_norm in ['ucs', 'ccs', 'uccs', 'uconv', 'fconv', 'ufconv', 'cconv', 'ucconv', 'ccsuconv', 'n']
+    assert after_norm in ['ucs', 'ccs', 'uccs', 'uconv', 'fconv', 'nfconv', 'ufconv', 'cconv', 'ucconv', 'ccsuconv', 'n']
 
     if norm == 'n':
         norm_layer = lambda axis, name: (lambda inp: inp)
@@ -47,8 +47,8 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None, filters_emb 
                                                                          name=name + '_c', filters=K.int_shape(x)[axis],
                                                                          filters_emb=filters_emb, use_bias=False)([x, cls])
     elif after_norm == 'uconv':
-        after_norm_layer = lambda axis, name: lambda x: uncoditional_conv_layer(kernel_size=(1, 1),
-                                                               filters=K.int_shape(x)[axis], name=name)(x)
+        after_norm_layer = lambda axis, name: lambda x: unconditional_conv_layer(uncoditional_conv_layer(kernel_size=(1, 1),
+                                                                                 filters=K.int_shape(x)[axis], name=name)(x)
     elif after_norm == 'ucconv':
         def after_norm_layer(axis, name):
             def f(x):
@@ -72,10 +72,24 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None, filters_emb 
                 c = factor_conv_layer(number_of_classes=number_of_classes, name=name + '_c',
                                      filters=K.int_shape(x)[axis], filters_emb=filters_emb,
                                      use_bias=False)([x, cls])
-                u = uncoditional_conv_layer(kernel_size=(1, 1), filters=K.int_shape(x)[axis], name=name + '_u')(x)
+                u = NINConv11(locnet, filters=K.int_shape(x)[axis], name=name + '_u')(x)
                 out = Add(name=name + '_a')([c, u])
                 return out
             return f
+    elif after_norm == 'nfconv':
+       def after_norm_layer(axis, name):
+            def f(x):
+                locnet = Sequential()
+                locnet.add(Dense(64, input_shape=(K.int_shape(noise)[1], ), activation='relu'))
+                locnet.add(Dense(K.int_shape(x)[axis] * K.int_shape(x)[axis])) 
+                c = factor_conv_layer(number_of_classes=number_of_classes, name=name + '_c',
+                                     filters=K.int_shape(x)[axis], filters_emb=filters_emb,
+                                     use_bias=False)([x, cls])
+                u = NINConv11(locnet=locnet, filters=K.int_shape(x)[axis], name=name + '_u')([x, noise])
+                out = Add(name=name + '_a')([c, u])
+                return out
+            return f
+ 
     elif after_norm == 'n':
         after_norm_layer = lambda axis, name: lambda x: x
 
@@ -128,12 +142,12 @@ def make_generator(input_noise_shape=(128,), output_channels=3, input_cls_shape=
     y = dence_layer(units=np.prod(first_block_shape), kernel_initializer=glorot_init)(y)
     y = Reshape(first_block_shape)(y)
 
-    block_norm_layer = create_norm(block_norm, block_after_norm, cls=cls,
+    block_norm_layer = create_norm(block_norm, block_after_norm, cls=inp,
                              number_of_classes=number_of_classes, filters_emb=filters_emb,
                              uncoditional_conv_layer=conv_layer, conditional_conv_layer=cond_conv_layer,
                              factor_conv_layer=factor_conv_layer)
 
-    last_norm_layer = create_norm(last_norm, last_after_norm, cls=cls,
+    last_norm_layer = create_norm(last_norm, last_after_norm, cls=inp,
                              number_of_classes=number_of_classes, filters_emb=filters_emb,
                              uncoditional_conv_layer=conv_layer, conditional_conv_layer=cond_conv_layer,
                              factor_conv_layer=factor_conv_layer)

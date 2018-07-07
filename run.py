@@ -276,7 +276,7 @@ def main():
                         help='Normalization in generator block. b - batch, d - whitening, n - none, '
                              'dr - whitening with renornaliazation.')
     parser.add_argument("--generator_block_after_norm", default='ucs',
-                        choices=['ccs', 'fconv', 'ucs', 'uccs', 'ufconv', 'cconv', 'uconv', 'ucconv','ccsuconv', 'n'],
+                        choices=['ccs', 'fconv', 'ucs', 'uccs', 'ufconv', 'nfconv', 'cconv', 'uconv', 'ucconv','ccsuconv', 'n'],
                         help="Layer after block normalization. ccs - conditional shift and scale."
                              "ucs - uncoditional shift and scale. ucconv - condcoloring. ufconv - condcoloring + sa."
                              "n - None.")
