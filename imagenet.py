@@ -79,7 +79,7 @@ class ImageNetdataset(LabeledArrayDataset):
     def load_images_in_memmory(self, bucket_index):
         f = np.load(os.path.join(self.cache_dir, 'bucket_%s.npz' % bucket_index))
         self._X = f['x']
-        self._Y = f['y']
+        self._Y = f['y'] if self.conditional else None
         self._batches_before_shuffle = self._X.shape[0] // self._batch_size
         self._current_batch = 0
 

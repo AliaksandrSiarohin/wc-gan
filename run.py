@@ -46,7 +46,7 @@ def get_dataset(dataset, batch_size, supervised = False, noise_size=(128, )):
         (X, y), (X_test, y_test) = load_data()
     elif dataset == 'imagenet':
         from imagenet import ImageNetdataset
-        return ImageNetdataset('../imagenet-resized', '../imagenet-resized-val/val', batch_size=batch_size, noise_size=noise_size)
+        return ImageNetdataset('../imagenet-resized', '../imagenet-resized-val/val', batch_size=batch_size, noise_size=noise_size, conditional=supervised)
 
     return LabeledArrayDataset(X=X, y=y if supervised else None, X_test=X_test, y_test=y_test,
                                batch_size=batch_size, noise_size=noise_size)
@@ -114,7 +114,7 @@ def get_lr_decay_schedule(args):
                                 K.less(iter, K.cast(number_of_iters_discriminator / 2, 'int64')),
                                 ktf.maximum(0., 1. - (K.cast(iter, 'float32') / number_of_iters_discriminator)), 0.5)
     elif args.lr_decay_schedule == 'linear-end':
-        decay_at = 0.9
+        decay_at = 0.828
 
         number_of_iters_until_decay_generator = number_of_iters_generator * decay_at
         number_of_iters_until_decay_discriminator = number_of_iters_discriminator * decay_at
@@ -157,9 +157,13 @@ def get_generator_params(args):
                                   args.generator_filters]
             params.resamples = ("UP", "UP", "UP", "UP")
         elif args.dataset.endswith('imagenet'):
-            params.block_sizes = [args.generator_filters, args.generator_filters / 2, args.generator_filters / 4,
-                                  args.generator_filters / 8, args.generator_filters / 16]
-            params.resamples = ("UP", "UP", "UP", "UP", "UP")
+#            params.block_sizes = [args.generator_filters, args.generator_filters / 2, args.generator_filters / 4,
+#                                  args.generator_filters / 8, args.generator_filters / 16]
+            params.block_sizes = [args.generator_filters, args.generator_filters,
+				  args.generator_filters,
+                                  args.generator_filters / 2, args.generator_filters / 4]
+ 
+            params.resamples = ("UP",  "UP", "UP", "UP", "UP")
         else:
             params.block_sizes = tuple([args.generator_filters] * 2) if args.dataset.endswith('mnist') else tuple([args.generator_filters] * 3)
             params.resamples = ("UP", "UP") if args.dataset.endswith('mnist') else ("UP", "UP", "UP")
