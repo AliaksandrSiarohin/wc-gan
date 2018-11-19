@@ -157,11 +157,8 @@ def get_generator_params(args):
                                   args.generator_filters]
             params.resamples = ("UP", "UP", "UP", "UP")
         elif args.dataset.endswith('imagenet'):
-#            params.block_sizes = [args.generator_filters, args.generator_filters / 2, args.generator_filters / 4,
-#                                  args.generator_filters / 8, args.generator_filters / 16]
             params.block_sizes = [args.generator_filters, args.generator_filters,
-				  args.generator_filters,
-                                  args.generator_filters / 2, args.generator_filters / 4]
+				  args.generator_filters, args.generator_filters / 2, args.generator_filters / 4]
  
             params.resamples = ("UP",  "UP", "UP", "UP", "UP")
         else:

@@ -6,6 +6,7 @@ from tqdm import tqdm
 import keras.backend as K
 from skimage.io import imsave
 import os
+import pickle
 
 def draw_grid(fname, images, labels = None,  nrows = 10, ncols = 10):
     if labels is None:
@@ -18,6 +19,29 @@ def draw_grid(fname, images, labels = None,  nrows = 10, ncols = 10):
     sample_images = sample_images.astype('uint8')
     image = UGANDataset(None, None).display(sample_images, None, nrows, ncols)
     imsave(fname, image)
+
+
+def save_images(dir_name, images, labels):
+     if not os.path.exists(dir_name):
+	 os.makedirs(dir_name)
+     #Load class metadata
+     f = open('synset_words.txt')
+     name_to_synset = {}
+     for line in f.readlines():
+         name, synset = line.split(' ', 1)
+         name_to_synset[name] = synset[:-1]
+     #print (name_to_synset)
+     with open('ti_classses.pkl') as f:
+         index_to_name = pickle.load(f)
+
+     for i in np.unique(labels):
+         name = name_to_synset[index_to_name[int(i)]]
+         sample_images = images[labels == i][:16].astype('uint8')
+         sample_images = sample_images.astype('uint8')
+         image = UGANDataset(None, None).display(sample_images, None, 4, 4) 
+	 imsave(os.path.join(dir_name, name + '.jpg'), image)
+
+    
 
 def compute_scores(epoch, image_shape, generator, dataset, images_inception=50000, images_fid=10000,
                    log_file=None, cache_file='mnist_fid.npz', additional_info=""):
@@ -32,7 +56,6 @@ def compute_scores(epoch, image_shape, generator, dataset, images_inception=5000
     generator_input = generator.get_input_at(0)
     if type(generator_input) != list:
         generator_input = [generator_input]
-    print generator_input
 
     predict_fn = K.function(generator_input + [K.learning_phase()], [generator.get_output_at(0)])
     
@@ -57,7 +80,7 @@ def compute_scores(epoch, image_shape, generator, dataset, images_inception=5000
             return np.concatenate([array, array, array], axis=-1)
         else:
             return array
-
+    #save_images('baseline_16', to_rgb(images), labels)
     draw_grid(os.path.join(os.path.dirname(log_file), "epoch_%s_imagegrid.png" % epoch),
               to_rgb(images), labels if conditional else None)
 

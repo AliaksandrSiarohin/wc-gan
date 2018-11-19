@@ -6,6 +6,8 @@ from skimage import img_as_ubyte
 from tqdm import tqdm
 from skimage.io import imread
 from skimage.color import gray2rgb
+import pickle
+
 
 def load_data():
     """Loads tiny-imagenet dataset.
@@ -27,8 +29,10 @@ def load_data():
         classes = []
         for cls in os.listdir(os.path.join(path, subdir)):
             classes.append(cls)
-
-        classes = {name: i for i, name in enumerate(classes)}
+#        f = open('ti_classses.pkl', 'w')
+#        pickle.dump(classes, f)
+#        f.close()
+        classes = {name: i for i, name in enumerate(classes)}     
         i = 0
         for cls in tqdm(os.listdir(os.path.join(path, subdir))):
             for img in os.listdir(os.path.join(path, subdir, cls, 'images')):
