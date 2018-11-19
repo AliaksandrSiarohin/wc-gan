@@ -21,7 +21,7 @@ def create_norm(norm, after_norm, cls=None, number_of_classes=None, filters_emb 
     elif norm == 'b':
         norm_layer = lambda axis, name: BatchNormalization(axis=axis, center=False, scale=False, name=name)
     elif norm == 'd':
-        norm_layer = lambda axis, name: DecorelationNormalization(name=name, decomposition='zca')
+        norm_layer = lambda axis, name: DecorelationNormalization(name=name)#, decomposition='zca')
     elif norm == 'dr':
         norm_layer = lambda axis, name: DecorelationNormalization(name=name, renorm=True)
 
