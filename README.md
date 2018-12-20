@@ -35,7 +35,6 @@ will train GAN for cifar10 dataset, with resnet architecture, spectral normalize
 
 All dataset except for imagenet downloaded and trained at the same time.
 
-<!---
 ### Imagenet
 
 0. This will consume a loot of memory. Because dataset is packed into numpy files for sequential reads.
@@ -50,7 +49,7 @@ All dataset except for imagenet downloaded and trained at the same time.
 
 4. Now you can remove ILSVRC2012
 5. ```CUDA_VISIBLE_DEVICES=0 scripts/imagenet_resnet_sn_cond_sa.sh``` This will first pack imagenet into numpy files, and then start traning.
---->
+
 
 
 
