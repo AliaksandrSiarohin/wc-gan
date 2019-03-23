@@ -50,6 +50,16 @@ All dataset except for imagenet downloaded and trained at the same time.
 4. Now you can remove ILSVRC2012
 5. ```CUDA_VISIBLE_DEVICES=0 scripts/imagenet_resnet_sn_cond_sa.sh``` This will first pack imagenet into numpy files, and then start traning.
 
-
+Citation:
+```
+@inproceedings{
+	siarohin2018whitening,
+	title={Whitening and Coloring transform for {GAN}s},
+	author={Aliaksandr Siarohin and Enver Sangineto and Nicu Sebe},
+	booktitle={ICLR},
+	year={2019},
+	url={https://openreview.net/forum?id=S1x2Fj0qKQ}
+}
+```
 
 
