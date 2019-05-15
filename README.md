@@ -1,6 +1,8 @@
 # Whitening and Coloring transform for GANs
 
 [Check out our paper](https://arxiv.org/abs/1806.00420)
+
+
 <p>
   <table>
 	<tr>
@@ -9,6 +11,9 @@
         </tr>
   </table> 
 </p>
+
+
+[<img src="sup-mat/iclr-2019-wc.png"/>](sup-mat/iclr-2019-wc.pdf)
 
 ### Requirments
 * python2
